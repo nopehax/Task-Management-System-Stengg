@@ -3,11 +3,27 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import { AuthProvider } from './utils/authContext';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import ApplicationPage from './pages/ApplicationPage';
+import ProtectedRoute from './utils/protectedRoute';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <App />
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<App />} />
+
+          // Protected routes
+          <Route element={<ProtectedRoute />}>
+            <Route path="/applications" element={<ApplicationPage />} />
+          </Route>
+
+        </Routes>
+      </BrowserRouter>
+    </ AuthProvider>
   </React.StrictMode>
 );
 

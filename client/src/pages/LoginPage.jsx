@@ -1,12 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../utils/authContext";
+import { useNavigate } from "react-router-dom";
 
-const API_URL = "http://localhost:3000/api/login"; // change if your backend runs elsewhere
-
-const LoginPage = ({ onLogin }) => {
+const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState([]);   // array of strings
   const [loading, setLoading] = useState(false);
+  const { login, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    console.log('isAuthenticated changed:', isAuthenticated);
+    if (isAuthenticated) {
+      navigate("/applications");
+    }
+  }, [isAuthenticated]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,21 +33,9 @@ const LoginPage = ({ onLogin }) => {
     setErrors([]);
 
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setErrors([data?.error || "Login failed. Please check your credentials."]);
-        return;
-      }
-      // if (typeof onLogin === "function") onLogin(data);
-      sessionStorage.setItem("authToken", data); // TODO Remove after implementing JWT
+      await login(username, password);
     } catch (err) {
-      setErrors([`${err}\nNetwork error. Please try again.`]);
+      setErrors([`${err}`]);
     } finally {
       setLoading(false);
     }

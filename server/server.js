@@ -77,6 +77,7 @@ app.post('/api/login', async (req, res) => {
     const token = "randomalphanumer1c"
 
     // Minimal user info back to the client
+    console.log('Login successful: ', user.username);
     return res.json({
       token,
       user: {
