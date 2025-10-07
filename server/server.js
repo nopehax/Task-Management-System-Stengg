@@ -15,7 +15,7 @@ app.use(helmet());
 
 // // cors
 app.use(cors({
-  origin: "http://localhost:3001"
+  // origin: "http://localhost:3001"
 }))
 
 // mysql pool
@@ -89,6 +89,22 @@ app.post('/api/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+app.get("/api/users", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `
+      SELECT id, username, email, userGroup
+      FROM accounts
+      ORDER BY FIELD(userGroup, 'dev_team','project_manager','project_lead','admin'), id ASC
+      `
+    );
+    return res.json(rows);
+  } catch (err) {
+    console.error("Get usersList error:", err);
+    return res.status(500).json({ error: "Failed to fetch users." });
   }
 });
 
