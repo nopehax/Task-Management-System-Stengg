@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import HeaderPage from "../components/Header";
 
-// TODO look through and understand all code
-const API_BASE = "http://localhost:3000"; // e.g. "http://localhost:4000"
+const API_BASE = "http://localhost:3000";
 const authHeaders = {}; // e.g. { Authorization: `Bearer ${token}` }
 
 const GROUPS = [
@@ -75,8 +74,13 @@ export default function UserManagementPage() {
             saving: false,
             rowErr: "",
             savedTick: false,
-          }))
-          .sort((a,b) => a.id - b.id);
+            __orig: {
+              username: u.username,
+              email: u.email,
+              userGroup: u.userGroup,
+              active: u.active,
+            },
+          }));
         setRows(normalized);
       } catch (e) {
         setPageError((e instanceof Error ? e.message : String(e)) + '. Please try again later.');
@@ -105,32 +109,55 @@ export default function UserManagementPage() {
     setRows(prev => prev.map(r => (r.id === row.id ? { ...r, rowErr: err } : r)));
     if (err) return;
 
-    const body = {
-      username: row.username,
-      email: row.email,
-      userGroup: row.userGroup,
-      active: row.active,
-      ...(row.password ? { password: row.password } : {}),
-    };
+    const allowed = ["username", "email", "userGroup"];
+    const diff = {};
+    for (const k of allowed) {
+      const prevVal = row.__orig ? row.__orig[k] : undefined;
+      if (row[k] !== prevVal) diff[k] = row[k];
+    }
+    if (row.password) diff.password = row.password;
+
+    const payload = {...diff};
+    if (Object.keys(payload).length === 0) {
+      // if no changes
+      setRows(prev => prev.map(r => r.id === row.id ? { ...r, rowErr: "No changes to save." } : r));
+      return;
+    }
 
     setRows(prev => prev.map(r => (r.id === row.id ? { ...r, saving: true, rowErr: "" } : r)));
     try {
       const res = await fetch(`${API_BASE}/api/users/${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
-        body: JSON.stringify(body),
+        body: JSON.stringify(payload),
       });
+
+      const updated = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Save failed (${res.status})`);
+        throw new Error(updated.error || `Save failed (${res.status})`);
       }
-      // Clear password field after successful save; flash a tick
-      setRows(prev => prev.map(r =>
-        r.id === row.id ? { ...r, password: "", saving: false, savedTick: true } : r
-      ));
+      // Merge response, clear password, refresh __orig snapshot
+      setRows(prev => prev.map(r => {
+        if (r.id !== row.id) return r;
+        const merged = {
+          ...r,
+          ...updated,
+          password: "",
+          saving: false,
+          savedTick: true,
+        };
+        merged.__orig = {
+          username: merged.username,
+          email: merged.email,
+          userGroup: merged.userGroup,
+          active: !!merged.active,
+        };
+        return merged;
+      }));
+
       setTimeout(() => {
         setRows(prev => prev.map(r => (r.id === row.id ? { ...r, savedTick: false } : r)));
-      }, 1200);
+      }, 2000);
     } catch (e) {
       setRows(prev => prev.map(r =>
         r.id === row.id ? { ...r, saving: false, rowErr: e instanceof Error ? e.message : String(e) } : r
@@ -266,7 +293,7 @@ export default function UserManagementPage() {
                     className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
                     value={newUser.password}
                     onChange={(e) => setNewUser(s => ({ ...s, password: e.target.value }))}
-                    placeholder="min 6 chars"
+                    placeholder="8-10 chars only"
                   />
                 </td>
                 <td className="px-4 py-2">
