@@ -54,7 +54,7 @@ const isValidPass = (password) => {
     return re.test(password)
 }
 
-// TODO currently no hashing for simplicity
+// KIV currently no hashing for simplicity
 const getHash = async (password) => {
   return password
   const hash = await bcrypt.hash(password,10)
@@ -68,6 +68,7 @@ const compareHash = async (password, hash) => {
 }
 
 app.get('/api/check', async (req, res) => {
+  console.log("Health check OK")
   return res.send("server is up and running :)")
 })
 
@@ -78,16 +79,19 @@ app.post('/api/login', async (req, res) => {
     const sql = 'SELECT id, email, username, password FROM accounts WHERE username = ? LIMIT 1';
     const [rows] = await pool.query(sql, [username]);
 
+    let isValid = true;
     if (!rows || rows.length === 0) {
-      console.log('Invalid username for user:', username);
-      return res.status(401).json({ error: 'Invalid username.' });
+      isValid = false;
     }
-    const user = rows[0];
 
+    const user = rows[0];
     const ok = await compareHash(password, user.password);
     if (!ok) {
-      console.log('Invalid password for user:', username);
-      return res.status(401).json({ error: 'Invalid password.' });
+      isValid = false;
+    }
+    if (!isValid) {
+      console.log('Unsuccessful login attempt by user: ', username);
+      return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
     // // Sign JWT
@@ -103,10 +107,9 @@ app.post('/api/login', async (req, res) => {
     //     audience: process.env.JWT_AUDIENCE || 'my-frontend',
     //   }
     // );
-    const token = "randomalphanumer1c"
+    const token = "somerandomalphanumer1c"
 
-    // Minimal user info back to the client
-    console.log('Login successful: ', user.username);
+    console.log('Login successful:', user.username);
     return res.json({
       token,
       user: {
@@ -130,7 +133,7 @@ app.get("/api/users", async (_req, res) => {
       ORDER BY id ASC
       `
     );
-    console.log('Fetched users:', rows.length);
+    console.log('userList fetched, count:', rows.length);
     return res.json(rows);
   } catch (err) {
     console.error("Get usersList error:", err);
@@ -142,6 +145,7 @@ app.post("/api/users", requireAuth, async (req, res) => {
   try {
     const { username, email, password, userGroup = "dev_team", active = 1 } = req.body || {};
     if (!username || !email || !password) {
+      console.log("Missing required field(s)");
       return res.status(400).json({ error: "username, email, and password are required" });
     }
     const hash = await getHash(password);
@@ -214,6 +218,7 @@ app.patch("/api/users/:id", requireAuth, async (req, res) => {
     const [result] = await pool.execute(sql, values);
 
     if (result.affectedRows === 0) {
+      console.log("[PATCH] User not found for id:", id);
       return res.status(404).json({ error: "User not found" });
     }
 
@@ -222,6 +227,7 @@ app.patch("/api/users/:id", requireAuth, async (req, res) => {
       "SELECT `id`,`username`,`email`,`userGroup`,`active` FROM `accounts` WHERE `id`=? LIMIT 1",
       [id]
     );
+    console.log("Updated user id:", id);
     return res.json(rows[0]);
   } catch (err) {
     if (err && err.code === "ER_DUP_ENTRY") {
@@ -235,5 +241,5 @@ app.patch("/api/users/:id", requireAuth, async (req, res) => {
 // ----- Start server -----
 const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`Auth server listening on :${PORT}`);
+  console.log(`Backend server listening on :${PORT}`);
 });
