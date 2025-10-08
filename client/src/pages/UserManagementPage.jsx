@@ -256,7 +256,7 @@ export default function UserManagementPage() {
           <tbody className="text-sm">
             { !pageError &&
               // New user row
-              <tr className="bg-white">
+              <tr className="bg-blue-100">
                 <td className="px-4 py-2 text-slate-400">—</td>
                 <td className="px-4 py-2">
                   <input
