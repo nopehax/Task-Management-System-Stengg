@@ -29,19 +29,46 @@ const pool = mysql.createPool({
   waitForConnections: true,
 });
 
-const isEmail = (email) => {
+// TODO JWT auth middleware
+function requireAuth(req, res, next) {
+  return next(); // TEMP DISABLE AUTH
+  const hdr = req.get("authorization") || "";
+  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
+    return next();
+  } catch {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+}
+
+const isValidEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return re.test(email)
 }
 
-const isPass = (password) => {
+const isValidPass = (password) => {
     if (password.length < 8 || password.length > 10) return false
     const re = /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};':",.<>\/?]+$/
     return re.test(password)
 }
 
+// TODO currently no hashing for simplicity
+const getHash = async (password) => {
+  return password
+  const hash = await bcrypt.hash(password,10)
+  console.log("Generated hash:", hash)
+  return hash
+}
+
+const compareHash = async (password, hash) => {
+  return password === hash
+  return await bcrypt.compare(password, hash)
+}
+
 app.get('/api/check', async (req, res) => {
-  return res.send("looks correct here")
+  return res.send("server is up and running :)")
 })
 
 app.post('/api/login', async (req, res) => {
@@ -57,7 +84,7 @@ app.post('/api/login', async (req, res) => {
     }
     const user = rows[0];
 
-    const ok = password == user.password;
+    const ok = await compareHash(password, user.password);
     if (!ok) {
       console.log('Invalid password for user:', username);
       return res.status(401).json({ error: 'Invalid password.' });

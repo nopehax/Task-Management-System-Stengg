@@ -95,8 +95,8 @@ export default function UserManagementPage() {
     if (!r.email?.trim()) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
     if (!GROUPS.some(g => g.value === r.userGroup)) return "User group is invalid.";
-    if (isNew && (!r.password || r.password.length < 6)) return "Password must be at least 6 characters.";
-    if (!isNew && r.password && r.password.length < 6) return "Password must be at least 6 characters.";
+    if (isNew && (!r.password || r.password.length < 8 || r.password.length > 10)) return "Password must be 8-10 characters.";
+    if (!isNew && r.password && r.password.length < 8 || r.password.length > 10) return "Password must be 8-10 characters.";
     return "";
   };
 
