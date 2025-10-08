@@ -127,7 +127,7 @@ app.get("/api/users", async (_req, res) => {
       `
       SELECT id, username, email, userGroup
       FROM accounts
-      ORDER BY FIELD(userGroup, 'dev_team','project_manager','project_lead','admin'), id ASC
+      ORDER BY id ASC
       `
     );
     console.log('Fetched users:', rows.length);
@@ -138,7 +138,99 @@ app.get("/api/users", async (_req, res) => {
   }
 });
 
-// TODO add api to create user and update user fields
+app.post("/api/users", requireAuth, async (req, res) => {
+  try {
+    const { username, email, password, userGroup = "dev_team", active = 1 } = req.body || {};
+    if (!username || !email || !password) {
+      return res.status(400).json({ error: "username, email, and password are required" });
+    }
+    const hash = await getHash(password);
+
+    const sql =
+      "INSERT INTO `accounts` (`username`,`password`,`email`,`userGroup`,`active`) VALUES (?,?,?,?,?)";
+    const params = [username, hash, email, userGroup, active ? 1 : 0];
+    const [result] = await pool.execute(sql, params);
+
+    console.log("Created user:", username);
+    return res.status(201).json({
+      id: result.insertId,
+      username,
+      email,
+      userGroup,
+      active: !!active,
+    });
+  } catch (err) {
+    if (err && err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "Username or email already exists" });
+    }
+    console.error("Create user error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+app.patch("/api/users/:id", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+
+    const allowed = ["username", "email", "userGroup", "active", "password"];
+    const incoming = req.body || {};
+
+    // Build SET clause dynamically
+    const sets = [];
+    const values = [];
+
+    for (const key of allowed) {
+      if (incoming[key] === undefined) continue;
+
+      if (key === "password") {
+        const raw = String(incoming.password ?? "");
+        if (!isValidPass(raw)) {
+          return res.status(400).json({ error: "Password does not meet requirements." });
+        }
+        const hash = await getHash(raw);
+        sets.push("`password` = ?");
+        values.push(hash);
+      } else if (key === "active") {
+        sets.push("`active` = ?");
+        values.push(incoming.active ? 1 : 0);
+      } else if (key === "userGroup") {
+        sets.push("`userGroup` = ?");
+        values.push(incoming.userGroup);
+      } else {
+        sets.push("`" + key + "` = ?");
+        values.push(incoming[key]);
+      }
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ error: "No updatable fields provided" });
+    }
+
+    values.push(id);
+    const sql = `UPDATE \`accounts\` SET ${sets.join(", ")} WHERE \`id\` = ? LIMIT 1`;
+    const [result] = await pool.execute(sql, values);
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Return the updated row (sans password)
+    const [rows] = await pool.execute(
+      "SELECT `id`,`username`,`email`,`userGroup`,`active` FROM `accounts` WHERE `id`=? LIMIT 1",
+      [id]
+    );
+    return res.json(rows[0]);
+  } catch (err) {
+    if (err && err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "Username or email already exists" });
+    }
+    console.error("Patch user error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
 
 // ----- Start server -----
 const PORT = 3000;
