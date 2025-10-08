@@ -52,12 +52,14 @@ app.post('/api/login', async (req, res) => {
     const [rows] = await pool.query(sql, [username]);
 
     if (!rows || rows.length === 0) {
+      console.log('Invalid username for user:', username);
       return res.status(401).json({ error: 'Invalid username.' });
     }
     const user = rows[0];
 
     const ok = password == user.password;
     if (!ok) {
+      console.log('Invalid password for user:', username);
       return res.status(401).json({ error: 'Invalid password.' });
     }
 
@@ -101,12 +103,15 @@ app.get("/api/users", async (_req, res) => {
       ORDER BY FIELD(userGroup, 'dev_team','project_manager','project_lead','admin'), id ASC
       `
     );
+    console.log('Fetched users:', rows.length);
     return res.json(rows);
   } catch (err) {
     console.error("Get usersList error:", err);
     return res.status(500).json({ error: "Failed to fetch users." });
   }
 });
+
+// TODO add api to create user and update user fields
 
 // ----- Start server -----
 const PORT = 3000;
