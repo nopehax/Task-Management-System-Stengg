@@ -7,6 +7,7 @@ import { AuthProvider } from './utils/authContext';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ApplicationPage from './pages/ApplicationPage';
 import ProtectedRoute from './utils/protectedRoute';
+import UserManagementPage from './pages/UserManagementPage';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -19,6 +20,7 @@ root.render(
           // Protected routes
           <Route element={<ProtectedRoute />}>
             <Route path="/applications" element={<ApplicationPage />} />
+            <Route path='/usermanage' element={<UserManagementPage />} />
           </Route>
 
         </Routes>
