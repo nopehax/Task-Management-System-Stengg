@@ -128,7 +128,7 @@ app.get("/api/users", async (_req, res) => {
   try {
     const [rows] = await pool.query(
       `
-      SELECT id, username, email, userGroup
+      SELECT id, username, email, userGroup, active
       FROM accounts
       ORDER BY id ASC
       `
