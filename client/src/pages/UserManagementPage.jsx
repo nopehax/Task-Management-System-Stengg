@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import HeaderPage from "../components/Header";
 
 const API_BASE = "http://localhost:3000";
@@ -15,23 +15,23 @@ const GROUPS = [
 function Toggle({ checked, onChange, disabled }) {
   return (
     <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      disabled={disabled}
-      className={[
-        "inline-flex h-6 w-11 items-center rounded-full transition",
-        checked ? "bg-emerald-600" : "bg-slate-300",
-        disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
-      ].join(" ")}
-      aria-pressed={checked}
-      aria-label="Toggle Active"
+    type="button"
+    onClick={() => onChange(!checked)}
+    disabled={disabled}
+    className={[
+      "inline-flex h-6 w-11 items-center rounded-full transition",
+      checked ? "bg-emerald-600" : "bg-slate-300",
+      disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
+    ].join(" ")}
+    aria-pressed={checked}
+    aria-label="Toggle Active"
     >
       <span
         className={[
           "h-5 w-5 rounded-full bg-white shadow transform transition",
           checked ? "translate-x-5" : "translate-x-1",
         ].join(" ")}
-      />
+        />
     </button>
   );
 }
@@ -51,6 +51,11 @@ export default function UserManagementPage() {
   });
   const [creating, setCreating] = useState(false);
   const [createErr, setCreateErr] = useState("");
+  
+  const toggleActive = async (row) => {
+    const nextActive = !row.active;
+    setRows(prev => prev.map(r => (r.id === row.id ? { ...r, active: nextActive, saving: false, rowErr: "" } : r)));
+  };
 
   // Load users on mount
   useEffect(() => {
@@ -64,12 +69,12 @@ export default function UserManagementPage() {
         if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
         const data = await res.json();
         const normalized = (data || [])
-          .map(u => ({
+        .map(u => ({
             id: u.id,
             username: u.username ?? "",
             email: u.email ?? "",
             userGroup: u.userGroup ?? "dev_team",
-            active: typeof u.active === "boolean" ? u.active : true,
+            active: u.active,
             password: "",       // only send if user types a new one
             saving: false,
             rowErr: "",
@@ -100,7 +105,7 @@ export default function UserManagementPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
     if (!GROUPS.some(g => g.value === r.userGroup)) return "User group is invalid.";
     if (isNew && (!r.password || r.password.length < 8 || r.password.length > 10)) return "Password must be 8-10 characters.";
-    if (!isNew && r.password && r.password.length < 8 || r.password.length > 10) return "Password must be 8-10 characters.";
+    if (!isNew && r.password && (r.password.length < 8 || r.password.length > 10)) return "Password must be 8-10 characters.";
     return "";
   };
 
@@ -109,7 +114,7 @@ export default function UserManagementPage() {
     setRows(prev => prev.map(r => (r.id === row.id ? { ...r, rowErr: err } : r)));
     if (err) return;
 
-    const allowed = ["username", "email", "userGroup"];
+    const allowed = ["username", "email", "userGroup", "active"];
     const diff = {};
     for (const k of allowed) {
       const prevVal = row.__orig ? row.__orig[k] : undefined;
@@ -165,28 +170,6 @@ export default function UserManagementPage() {
     }
   };
 
-  // send PATCH on toggle
-  const toggleActive = async (row) => {
-    const nextActive = !row.active;
-    setRows(prev => prev.map(r => (r.id === row.id ? { ...r, active: nextActive, saving: true, rowErr: "" } : r)));
-    try {
-      const res = await fetch(`${API_BASE}/api/users/${row.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
-        body: JSON.stringify({ active: nextActive }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Toggle failed (${res.status})`);
-      }
-      setRows(prev => prev.map(r => (r.id === row.id ? { ...r, saving: false } : r)));
-    } catch (e) {
-      // revert on failure
-      setRows(prev => prev.map(r =>
-        r.id === row.id ? { ...r, active: !nextActive, saving: false, rowErr: e instanceof Error ? e.message : String(e) } : r
-      ));
-    }
-  };
 
   const createUser = async () => {
     const err = validateRow(newUser, true);
