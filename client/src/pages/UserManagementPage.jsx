@@ -4,13 +4,6 @@ import HeaderPage from "../components/Header";
 const API_BASE = "http://localhost:3000";
 const authHeaders = {}; // e.g. { Authorization: `Bearer ${token}` }
 
-const GROUPS = [
-  { value: "admin",            label: "Admin" },
-  { value: "project_lead",     label: "Project Lead" },
-  { value: "project_manager",  label: "Project Manager" },
-  { value: "dev_team",         label: "Dev Team" },
-];
-
 // Simple toggle UI
 function Toggle({ checked, onChange, disabled }) {
   return (
@@ -39,6 +32,8 @@ function Toggle({ checked, onChange, disabled }) {
 export default function UserManagementPage() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState([]);
+  const [groupLoading, setGroupLoading] = useState(false);
   const [pageError, setPageError] = useState("");
 
   // New user row state
@@ -95,6 +90,16 @@ export default function UserManagementPage() {
     })();
   }, []);
 
+    // Fetch user groups on mount
+  useEffect(() => {
+    setGroupLoading(true);
+    fetch(`${API_BASE}/api/usergroups`, { headers: { Accept: "application/json", ...authHeaders } })
+      .then(res => res.json())
+      .then(data => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => setGroups([]))
+      .finally(() => setGroupLoading(false));
+  }, []);
+
   const setField = (id, field, value) => {
     setRows(prev => prev.map(r => (r.id === id ? { ...r, [field]: value } : r)));
   };
@@ -103,7 +108,7 @@ export default function UserManagementPage() {
     if (!r.username?.trim()) return "Username is required.";
     if (!r.email?.trim()) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
-    if (!GROUPS.some(g => g.value === r.userGroup)) return "User group is invalid.";
+  if (!groups.includes(r.userGroup)) return "User group is invalid.";
     if (isNew && (!r.password || r.password.length < 8 || r.password.length > 10)) return "Password must be 8-10 characters.";
     if (!isNew && r.password && (r.password.length < 8 || r.password.length > 10)) return "Password must be 8-10 characters.";
     return "";
@@ -212,9 +217,25 @@ export default function UserManagementPage() {
     }
   };
 
+  const addNewGroup = async () => {
+    const groupName = window.prompt("Enter new group name:");
+    if (!groupName || !groupName.trim()) return;
+    const res = await fetch(`${API_BASE}/api/usergroups`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders },
+      body: JSON.stringify({ groupName: groupName.trim() })
+    });
+    if (res.ok) {
+      setGroups(prev => prev.includes(groupName.trim()) ? prev : [...prev, groupName.trim()]);
+      alert("Group added!");
+    } else {
+      alert("Failed to add group");
+    }
+  }
+
   const canCreate = newUser.username && newUser.email && newUser.password && !creating;
 
-  if (loading) return <div className="p-6">Loading users…</div>;
+  if (loading && groupLoading) return <div className="p-6">Loading users…</div>;
 
   return (
 
@@ -229,7 +250,16 @@ export default function UserManagementPage() {
             <tr>
               <th className="text-left px-4 py-3">User ID</th>
               <th className="text-left px-4 py-3">Username</th>
-              <th className="text-left px-4 py-3">User Group</th>
+              <th className="text-left px-4 py-3">
+                <div className="flex items-center">
+                  <span>User Group</span>
+                  <button
+                    className="grid place-items-center w-7 h-7 rounded-full text-slate-600 text-lg font-bold leading-none hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    title="Add Group"
+                    onClick={addNewGroup}
+                  >+</button>
+                </div>
+              </th>
               <th className="text-left px-4 py-3">Email</th>
               <th className="text-left px-4 py-3">Password</th>
               <th className="text-left px-4 py-3">Active</th>
@@ -256,7 +286,7 @@ export default function UserManagementPage() {
                       value={newUser.userGroup}
                       onChange={(e) => setNewUser(s => ({ ...s, userGroup: e.target.value }))}
                     >
-                      {GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                      {groups.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                     <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">▾</span>
                   </div>
@@ -322,7 +352,7 @@ export default function UserManagementPage() {
                         value={r.userGroup}
                         onChange={(e) => setField(r.id, "userGroup", e.target.value)}
                       >
-                        {GROUPS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                        {groups.map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">▾</span>
                     </div>

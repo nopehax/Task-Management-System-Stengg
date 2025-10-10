@@ -16,7 +16,7 @@ const LoginPage = () => {
     if (isAuthenticated) {
       navigate("/applications");
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
