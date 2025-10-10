@@ -141,6 +141,41 @@ app.get("/api/users", async (_req, res) => {
   }
 });
 
+app.get("/api/usergroups", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(`SELECT groupName FROM userGroups`);
+    console.log("userGroups fetched, count:", rows.length);
+    return res.json(rows.map(r => r.groupName));
+  } catch (err) {
+    console.error("Get userGroups error:", err);
+    return res.status(500).json({ error: "Failed to fetch user groups." });
+  }
+});
+
+// Add a new group to userGroups table
+app.post("/api/usergroups", async (req, res) => {
+  try {
+    const { groupName } = req.body || {};
+    if (!groupName || typeof groupName !== "string" || !groupName.trim()) {
+      return res.status(400).json({ error: "groupName is required" });
+    }
+    try {
+      const [result] = await pool.execute("INSERT INTO userGroups (groupName) VALUES (?)", [groupName]);
+      console.log("Created new userGroup:", groupName);
+      return res.status(201).json({ groupName });
+    } catch (err) {
+      // If duplicate, just return OK
+      if (err && err.code === "ER_DUP_ENTRY") {
+        return res.status(200).json({ groupName });
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error("Add userGroup error:", err);
+    return res.status(500).json({ error: "Failed to add user group." });
+  }
+});
+
 app.post("/api/users", requireAuth, async (req, res) => {
   try {
     const { username, email, password, userGroup = "dev_team", active = 1 } = req.body || {};
