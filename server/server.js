@@ -8,15 +8,23 @@ const rateLimit = require('express-rate-limit');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 app.use(express.json())
 app.use(helmet());
+app.use(cookieParser());
 
-// // cors
-app.use(cors({
-  // origin: "http://localhost:3001"
-}))
+// cors
+
+const corsOptions = {
+  origin: "http://localhost:3001",
+  credentials: true,
+  methods: ['GET','POST','PATCH'],
+  allowedHeaders: ['Content-Type','Authorization'],
+};
+
+app.use(cors(corsOptions));
 
 // mysql pool
 const pool = mysql.createPool({
@@ -29,14 +37,13 @@ const pool = mysql.createPool({
   waitForConnections: true,
 });
 
-// TODO JWT auth middleware
+// --- JWT Auth Middleware using cookies ---
 function requireAuth(req, res, next) {
-  return next(); // TEMP DISABLE AUTH
-  const hdr = req.get("authorization") || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+  const token = req.cookies && req.cookies.token;
   if (!token) return res.status(401).json({ error: "Unauthorized" });
   try {
-    jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
+    req.user = decoded;
     return next();
   } catch {
     return res.status(401).json({ error: "Unauthorized" });
@@ -72,46 +79,41 @@ app.get('/api/check', async (req, res) => {
   return res.send("server is up and running :)")
 })
 
+// --- Login: issue JWT in cookie ---
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
-    
-    const sql = 'SELECT id, email, username, password FROM accounts WHERE username = ? LIMIT 1';
+    const sql = 'SELECT id, email, username, password, active FROM accounts WHERE username = ? LIMIT 1';
     const [rows] = await pool.query(sql, [username]);
-
-    let isValid = true;
     if (!rows || rows.length === 0) {
-      isValid = false;
+      console.log('login unsuccessful: wrong username');
+      return res.status(401).json({ error: 'Invalid username or password.' });
     }
-
     const user = rows[0];
-    const ok = await compareHash(password, user.password);
-    if (!ok) {
-      isValid = false;
+    if (!user.active) {
+      console.log('login unsuccessful: inactive user');
+      return res.status(403).json({ error: 'Invalid username or password.' });
     }
-    if (!isValid) {
-      console.log('Unsuccessful login attempt by user: ', username);
+     if (!(await compareHash(password, user.password))) {
+      console.log('login unsuccessful: wrong password');
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
-    // // Sign JWT
-    // const token = jwt.sign(
-    //   {
-    //     sub: String(user.id),
-    //     role: user.role || 'user',
-    //   },
-    //   process.env.JWT_SECRET,
-    //   {
-    //     expiresIn: process.env.JWT_EXPIRES_IN || '1h',
-    //     issuer: process.env.JWT_ISSUER || 'server',
-    //     audience: process.env.JWT_AUDIENCE || 'my-frontend',
-    //   }
-    // );
-    const token = "somerandomalphanumer1c"
-
+    console.log('username and password match');
+    // Sign JWT
+    const token = jwt.sign(
+      { sub: String(user.id), username: user.username, userGroup: user.userGroup },
+      process.env.JWT_SECRET || "dev-secret",
+      { expiresIn: process.env.JWT_EXPIRES_IN || '1d' }
+    );
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // if true, only transmit cookie over https; no need for localhost
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000 // 1 day
+    });
     console.log('Login successful:', user.username);
     return res.json({
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -122,6 +124,79 @@ app.post('/api/login', async (req, res) => {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Something went wrong.' });
   }
+});
+
+// verify JWT from cookie and return current user
+app.get('/api/me', async (req, res) => {
+  try {
+    const token = req.cookies?.token;
+    if (!token) return res.status(401).json({ error: 'Not authenticated' });
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    } catch {
+      res.clearCookie('token', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      });
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const userId = Number(payload.sub);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, username, email, userGroup, active FROM accounts WHERE id = ? LIMIT 1',
+      [userId]
+    );
+
+    if (!rows || rows.length === 0) {
+      // (optional) clear cookie if user no longer exists
+      res.clearCookie('token', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      });
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    const u = rows[0];
+    if (!u.active) {
+      res.clearCookie('token', {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+      });
+      return res.status(401).json({ error: 'Invalid token' });
+    } else {
+      return res.json({
+        user: {
+          id: u.id,
+          username: u.username,
+          email: u.email,
+          userGroup: u.userGroup,
+          active: !!u.active,
+        },
+      });
+    }
+  } catch (err) {
+    console.error('/api/me error:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+// --- Logout: clear JWT cookie ---
+app.post('/api/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ ok: true });
 });
 
 app.get("/api/users", async (_req, res) => {
