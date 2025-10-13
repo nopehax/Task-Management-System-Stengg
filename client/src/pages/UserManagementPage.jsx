@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from "react";
+import axios from "axios";
 import HeaderPage from "../components/Header";
 
-const API_BASE = "http://localhost:3000";
+axios.defaults.baseURL = "http://localhost:3000";
+axios.defaults.withCredentials = true;
 const authHeaders = {}; // e.g. { Authorization: `Bearer ${token}` }
+axios.defaults.headers = { ...authHeaders };
 
 // Simple toggle UI
 function Toggle({ checked, onChange, disabled }) {
@@ -58,12 +61,9 @@ export default function UserManagementPage() {
       setLoading(true);
       setPageError("");
       try {
-        const res = await fetch(`${API_BASE}/api/users`, {
-          credentials: 'include',
-          headers: { Accept: "application/json", ...authHeaders },
+        const { data } = await axios.get('/api/users', {
+          headers: { Accept: "application/json" },
         });
-        if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
-        const data = await res.json();
         const normalized = (data || [])
         .map(u => ({
             id: u.id,
@@ -94,12 +94,10 @@ export default function UserManagementPage() {
     // Fetch user groups on mount
   useEffect(() => {
     setGroupLoading(true);
-    fetch(`${API_BASE}/api/usergroups`, {
-      credentials: 'include',
-      headers: { Accept: "application/json", ...authHeaders } 
+    axios.get('/api/usergroups', {
+      headers: { Accept: "application/json" }
     })
-      .then(res => res.json())
-      .then(data => setGroups(Array.isArray(data) ? data : []))
+      .then(res => setGroups(Array.isArray(res.data) ? res.data : []))
       .catch(() => setGroups([]))
       .finally(() => setGroupLoading(false));
   }, []);
@@ -140,17 +138,13 @@ export default function UserManagementPage() {
 
     setRows(prev => prev.map(r => (r.id === row.id ? { ...r, saving: true, rowErr: "" } : r)));
     try {
-      const res = await fetch(`${API_BASE}/api/users/${row.id}`, {
-        method: "PATCH",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
-        body: JSON.stringify(payload),
-      });
-
-      const updated = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(updated.error || `Save failed (${res.status})`);
-      }
+      const { data: updated } = await axios.patch(
+        `/api/users/${row.id}`,
+        payload,
+        {
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+        }
+      );
       // Merge response, clear password, refresh __orig snapshot
       setRows(prev => prev.map(r => {
         if (r.id !== row.id) return r;
@@ -187,17 +181,13 @@ export default function UserManagementPage() {
     if (err) return;
     setCreating(true);
     try {
-      const res = await fetch(`${API_BASE}/api/users`, {
-        method: "POST",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
-        body: JSON.stringify(newUser),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `Create failed (${res.status})`);
-      }
-      const created = await res.json();
+      const { data: created } = await axios.post(
+        '/api/users',
+        newUser,
+        {
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+        }
+      );
       // insert new user into table
       const newRow = {
         id: created.id,
@@ -226,16 +216,17 @@ export default function UserManagementPage() {
   const addNewGroup = async () => {
     const groupName = window.prompt("Enter new group name:");
     if (!groupName || !groupName.trim()) return;
-    const res = await fetch(`${API_BASE}/api/usergroups`, {
-      method: "POST",
-      credentials: 'include',
-      headers: { "Content-Type": "application/json", ...authHeaders },
-      body: JSON.stringify({ groupName: groupName.trim() })
-    });
-    if (res.ok) {
+    try {
+      await axios.post(
+        '/api/usergroups',
+        { groupName: groupName.trim() },
+        {
+          headers: { "Content-Type": "application/json"},
+        }
+      );
       setGroups(prev => prev.includes(groupName.trim()) ? prev : [...prev, groupName.trim()]);
       alert("Group added!");
-    } else {
+    } catch {
       alert("Failed to add group");
     }
   }
