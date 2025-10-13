@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 
 const AuthContext = createContext(null);
+axios.defaults.withCredentials = true;
 
 // Use relative paths; configure a dev proxy or CORS on the API.
 const API_LOGIN  = "http://localhost:3000/api/login";
@@ -17,21 +19,11 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(API_ME, { method: "GET", credentials: "include" });
-        if (!res.ok) {
-          // not logged in / cookie missing/invalid
-          if (!cancelled) {
-            setIsAuthenticated(false);
-            setUser(null);
-            localStorage.removeItem("authUser");
-          }
-          return;
-        }
-        const data = await res.json().catch(() => ({}));
+        const res = await axios.get(API_ME);
         if (!cancelled) {
           setIsAuthenticated(true);
-          setUser(data?.user ?? null);
-          if (data?.user) localStorage.setItem("authUser", JSON.stringify(data.user));
+          setUser(res.data?.user ?? null);
+          if (res.data?.user) localStorage.setItem("authUser", JSON.stringify(res.data.user));
         }
       } catch {
         if (!cancelled) {
@@ -48,25 +40,26 @@ export const AuthProvider = ({ children }) => {
 
   // Login: sets HttpOnly cookie on success; we also store the returned user locally
   const login = async (username, password) => {
-    const res = await fetch(API_LOGIN, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // IMPORTANT: receive/set cookie
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || "Login failed. Please check your credentials.");
-
-    setIsAuthenticated(true);
-    setUser(data?.user ?? null);
-    if (data?.user) localStorage.setItem("authUser", JSON.stringify(data.user));
-    return data;
+    try {
+      const res = await axios.post(
+        API_LOGIN,
+        { username, password },
+        { headers: { "Content-Type": "application/json" } }
+      );
+      setIsAuthenticated(true);
+      setUser(res.data?.user ?? null);
+      if (res.data?.user) localStorage.setItem("authUser", JSON.stringify(res.data.user));
+      return res.data;
+    } catch (err) {
+      const msg = err?.response?.data?.error || "Login failed. Please check your credentials.";
+      throw new Error(msg);
+    }
   };
 
   // Logout: clear cookie on server and local state
   const logout = async () => {
     try {
-      await fetch(API_LOGOUT, { method: "POST", credentials: "include" });
+      await axios.post(API_LOGOUT);
     } catch {
       // ignore network errors on logout
     } finally {
