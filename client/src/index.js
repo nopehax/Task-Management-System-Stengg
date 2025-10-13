@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import ApplicationPage from './pages/ApplicationPage';
 import ProtectedRoute from './utils/protectedRoute';
 import UserManagementPage from './pages/UserManagementPage';
+import NotAuthorizedPage from './pages/NotAuthorizedPage';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -16,10 +17,14 @@ root.render(
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<App />} />
+          <Route path="/403" element={<NotAuthorizedPage />} />
 
           // Protected routes
           <Route element={<ProtectedRoute />}>
             <Route path="/applications" element={<ApplicationPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allow={['admin']}/>}>
             <Route path='/usermanage' element={<UserManagementPage />} />
           </Route>
 
