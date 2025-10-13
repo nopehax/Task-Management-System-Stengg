@@ -19,7 +19,7 @@ root.render(
           <Route path="/" element={<App />} />
           <Route path="/403" element={<NotAuthorizedPage />} />
 
-          // Protected routes
+          {/* // Protected routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/applications" element={<ApplicationPage />} />
           </Route>

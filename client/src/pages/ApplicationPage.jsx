@@ -6,7 +6,7 @@ const ApplicationPage = () => {
 	const { isAuthenticated } = useAuth();
 	useEffect(() => {
 		console.log('isAuthenticated:', isAuthenticated);
-	}, []);
+	}, [isAuthenticated]);
 
 	return (
 		<div>
