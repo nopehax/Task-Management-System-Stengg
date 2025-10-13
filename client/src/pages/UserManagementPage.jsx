@@ -59,6 +59,7 @@ export default function UserManagementPage() {
       setPageError("");
       try {
         const res = await fetch(`${API_BASE}/api/users`, {
+          credentials: 'include',
           headers: { Accept: "application/json", ...authHeaders },
         });
         if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
@@ -93,7 +94,10 @@ export default function UserManagementPage() {
     // Fetch user groups on mount
   useEffect(() => {
     setGroupLoading(true);
-    fetch(`${API_BASE}/api/usergroups`, { headers: { Accept: "application/json", ...authHeaders } })
+    fetch(`${API_BASE}/api/usergroups`, {
+      credentials: 'include',
+      headers: { Accept: "application/json", ...authHeaders } 
+    })
       .then(res => res.json())
       .then(data => setGroups(Array.isArray(data) ? data : []))
       .catch(() => setGroups([]))
@@ -138,6 +142,7 @@ export default function UserManagementPage() {
     try {
       const res = await fetch(`${API_BASE}/api/users/${row.id}`, {
         method: "PATCH",
+        credentials: 'include',
         headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
         body: JSON.stringify(payload),
       });
@@ -184,6 +189,7 @@ export default function UserManagementPage() {
     try {
       const res = await fetch(`${API_BASE}/api/users`, {
         method: "POST",
+        credentials: 'include',
         headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeaders },
         body: JSON.stringify(newUser),
       });
@@ -222,6 +228,7 @@ export default function UserManagementPage() {
     if (!groupName || !groupName.trim()) return;
     const res = await fetch(`${API_BASE}/api/usergroups`, {
       method: "POST",
+      credentials: 'include',
       headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ groupName: groupName.trim() })
     });

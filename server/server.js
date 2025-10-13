@@ -21,7 +21,7 @@ const corsOptions = {
   origin: "http://localhost:3001",
   credentials: true,
   methods: ['GET','POST','PATCH'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  allowedHeaders: ['Content-Type','Authorization', 'Accept', 'X-CSFR-Token'],
 };
 
 app.use(cors(corsOptions));
@@ -37,18 +37,73 @@ const pool = mysql.createPool({
   waitForConnections: true,
 });
 
+const checkGroup = async (userId, needGroup) => {
+  const [rows] = await pool.query(
+    'SELECT userGroup, active FROM accounts WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  if (!rows || rows.length === 0) return false;
+
+  const { userGroup, active } = rows[0];
+  if (!active) return false;
+  if (userGroup !== needGroup) return false;
+  return true;
+}
+
+
 // --- JWT Auth Middleware using cookies ---
-function requireAuth(req, res, next) {
-  const token = req.cookies && req.cookies.token;
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+const authRequired = (req, res, next) => {
+  const token = req.cookies?.token;
+  if (!token) {
+    console.log('token not found in cookie')
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
-    req.user = decoded;
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    req.auth = { id: Number(payload.sub), username: payload.username || '' };
     return next();
   } catch {
-    return res.status(401).json({ error: "Unauthorized" });
+    // Optional: clear bad/expired cookie
+    res.clearCookie('token', {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: isProd,
+      path: '/',
+    });
+    console.log('token invalid or expired')
+    return res.status(401).json({ error: 'Invalid or expired session' });
   }
 }
+
+// Authorization middleware factory: require that the current user belongs to
+// at least one of the supplied groups (case-insensitive).
+// Usage: app.post('/api/users', authRequired, requireGroup(['admin','project_lead']), handler)
+const requireGroup = (allowed, opts = {}) => {
+  const allowedSet = new Set(
+    (Array.isArray(allowed) ? allowed : [allowed])
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase())
+  );
+
+  return async function (req, res, next) {
+    try {
+      const userId = req.auth?.id; // set by your authRequired (JWT verify)
+      if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+      for (const grp of allowedSet) {
+        if (await checkGroup(userId, grp)) {
+          return next();
+        }
+      }
+      return res.status(403).json({ error: 'Not authorized' });
+    } catch (err) {
+      console.error('requireGroup error:', err);
+      return res.status(500).json({ error: 'Server error' });
+    }
+  };
+}
+
 
 const isValidEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -73,6 +128,10 @@ const compareHash = async (password, hash) => {
   return password === hash
   return await bcrypt.compare(password, hash)
 }
+
+
+// ------------------------------------------ Routes ----------------------------------------------------
+
 
 app.get('/api/check', async (req, res) => {
   console.log("Health check OK")
@@ -111,6 +170,7 @@ app.post('/api/login', async (req, res) => {
       secure: process.env.NODE_ENV === 'production', // if true, only transmit cookie over https; no need for localhost
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000 // 1 day
+      // maxAge: 10000 // 10s
     });
     console.log('Login successful:', user.username);
     return res.json({
@@ -134,7 +194,7 @@ app.get('/api/me', async (req, res) => {
 
     let payload;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+      payload = jwt.verify(token, process.env.JWT_SECRET);
     } catch {
       res.clearCookie('token', {
         httpOnly: true,
@@ -199,7 +259,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get("/api/users", async (_req, res) => {
+app.get("/api/users", authRequired, requireGroup(['admin']), async (_req, res) => {
   try {
     const [rows] = await pool.query(
       `
@@ -216,7 +276,7 @@ app.get("/api/users", async (_req, res) => {
   }
 });
 
-app.get("/api/usergroups", async (_req, res) => {
+app.get("/api/usergroups", authRequired, async (_req, res) => {
   try {
     const [rows] = await pool.query(`SELECT groupName FROM userGroups`);
     console.log("userGroups fetched, count:", rows.length);
@@ -228,7 +288,7 @@ app.get("/api/usergroups", async (_req, res) => {
 });
 
 // Add a new group to userGroups table
-app.post("/api/usergroups", async (req, res) => {
+app.post("/api/usergroups", authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const { groupName } = req.body || {};
     if (!groupName || typeof groupName !== "string" || !groupName.trim()) {
@@ -251,7 +311,7 @@ app.post("/api/usergroups", async (req, res) => {
   }
 });
 
-app.post("/api/users", requireAuth, async (req, res) => {
+app.post("/api/users", authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const { username, email, password, userGroup = "dev_team", active = 1 } = req.body || {};
     if (!username || !email || !password) {
@@ -282,7 +342,7 @@ app.post("/api/users", requireAuth, async (req, res) => {
   }
 });
 
-app.patch("/api/users/:id", requireAuth, async (req, res) => {
+app.patch("/api/users/:id", authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
