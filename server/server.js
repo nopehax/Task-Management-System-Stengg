@@ -142,7 +142,7 @@ app.get('/api/check', async (req, res) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
-    const sql = 'SELECT id, email, username, password, active FROM accounts WHERE username = ? LIMIT 1';
+    const sql = 'SELECT id, email, username, password, active, userGroup FROM accounts WHERE username = ? LIMIT 1';
     const [rows] = await pool.query(sql, [username]);
     if (!rows || rows.length === 0) {
       console.log('login unsuccessful: wrong username');
@@ -178,6 +178,7 @@ app.post('/api/login', async (req, res) => {
         id: user.id,
         username: user.username,
         email: user.email,
+        userGroup: user.userGroup,
       },
     });
   } catch (err) {

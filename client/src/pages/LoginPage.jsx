@@ -7,16 +7,20 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState([]);   // array of strings
   const [loading, setLoading] = useState(false);
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     // TODO navigate to /usermanage if admin, /applications if others
     console.log('isAuthenticated changed:', isAuthenticated);
     if (isAuthenticated) {
-      navigate("/applications");
+      if (user?.userGroup === 'admin') {
+        navigate("/usermanage");
+      } else {
+        navigate("/applications");
+      }
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
