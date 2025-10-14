@@ -409,6 +409,85 @@ app.patch("/api/users/:id", authRequired, requireGroup(['admin']), async (req, r
   }
 });
 
+app.patch("/api/user/:id", authRequired, requireGroup(['admin', 'project_lead', 'project_manager', 'dev_team']), async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid user id" });
+    }
+    // users can only update their own profile
+    if (req.auth.id !== id) {
+      return res.status(403).json({ error: "Not authorized to update this profile" });
+    }
+    const allowed = ["email", "password", "currentPassword"];
+    const incoming = req.body || {};
+    // Build SET clause dynamically
+    const sets = [];
+    const values = [];
+    let currentHash = null;
+
+    for (const key of allowed) {
+      if (incoming[key] === undefined) continue;
+      if (key === "password") {
+        const raw = String(incoming.password ?? "");
+        if (!isValidPass(raw)) {
+          return res.status(400).json({ error: "Password does not meet requirements." });
+        }
+        if (!incoming.currentPassword) {
+          return res.status(400).json({ error: "Current password is required to set a new password." });
+        }
+        if (currentHash === null) {
+          // fetch current hash
+          const [rows] = await pool.execute(
+            "SELECT `password` FROM `accounts` WHERE `id`=? LIMIT 1",
+            [id]
+          );
+          if (!rows || rows.length === 0) {
+            return res.status(404).json({ error: "User not found" });
+          }
+          currentHash = rows[0].password;
+        }
+        if (!(await compareHash(incoming.currentPassword, currentHash))) {
+          return res.status(400).json({ error: "Current password is incorrect." });
+        }
+        const hash = await getHash(raw);
+        sets.push("`password` = ?");
+        values.push(hash);
+      } else if (key === "email") {
+        if (!isValidEmail(incoming.email)) {
+          return res.status(400).json({ error: "Invalid email format." });
+        } 
+        sets.push("`email` = ?");
+        values.push(incoming.email);
+      }
+    }
+
+    if (sets.length === 0) {
+      return res.status(400).json({ error: "No updatable fields provided" });
+    }
+    values.push(id);
+    const sql = `UPDATE \`accounts\` SET ${sets.join(", ")} WHERE \`id\` = ? LIMIT 1`;
+    const [result] = await pool.execute(sql, values);
+    if (result.affectedRows === 0) {
+      console.log("[PATCH] User not found for id:", id);
+      return res.status(404).json({ error: "User not found" });
+    }
+    // Return the updated row (sans password)
+    const [rows] = await pool.execute(
+      "SELECT `id`,`username`,`email`,`userGroup`,`active` FROM `accounts` WHERE `id`=? LIMIT 1",
+      [id]
+    );
+    console.log("Updated user id:", id);
+    return res.json(rows[0]);
+  } catch (err) {
+    if (err && err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "Email already exists" });
+    }
+    console.error("Patch user error:", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
 // ----- Start server -----
 const PORT = 3000;
 app.listen(PORT, () => {

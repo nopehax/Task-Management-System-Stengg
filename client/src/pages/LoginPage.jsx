@@ -11,7 +11,6 @@ const LoginPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // TODO navigate to /usermanage if admin, /applications if others
     console.log('isAuthenticated changed:', isAuthenticated);
     if (isAuthenticated) {
       if (user?.userGroup === 'admin') {
