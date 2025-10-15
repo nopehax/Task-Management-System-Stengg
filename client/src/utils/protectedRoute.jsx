@@ -2,37 +2,47 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./authContext";
 
-/**
- * Usage:
- *   <Route element={<ProtectedRoute allow={['admin','project_lead']} />}>
- *     <Route path="/admin" element={<AdminPage />} />
- *   </Route>
- *
- *   // No group restriction (just needs to be logged in):
- *   <Route element={<ProtectedRoute />}>
- *     <Route path="/applications" element={<ApplicationsPage />} />
- *   </Route>
- */
+// local normalizer (mirrors server rules)
+const normalizeGroup = (name) =>
+  String(name || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "_")
+    .slice(0, 50);
+
 const ProtectedRoute = ({ allow }) => {
-  const { isAuthenticated, ready, user } = useAuth();
+  const { isAuthenticated, ready, user, hasAnyGroup } = useAuth();
   const location = useLocation();
 
-  if (!ready) return null; // wait for auth hydration to avoid flicker
+  // Avoid flicker until /api/me finishes
+  if (!ready) return null;
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user?.active) {
     return <Navigate to="/" replace state={{ from: location }} />;
   }
 
-  // Group check (optional): if "allow" provided, enforce membership
-  if (allow && allow.length) {
-    const allowed = Array.isArray(allow) ? allow : [allow];
-    const allowedSet = new Set(allowed.map((g) => String(g).toLowerCase()));
-    const userGroup = String(user?.userGroup ?? "").toLowerCase();
+  // If no allow list, it's just an auth gate
+  if (!allow || (Array.isArray(allow) && allow.length === 0)) {
+    return <Outlet />;
+  }
 
-    if (!userGroup || !allowedSet.has(userGroup)) {
-      // Not authorized for this route
-      return <Navigate to="/403" replace state={{ from: location }} />;
-    }
+  // OR semantics: pass if user has ANY of the allowed groups
+  const allowed = Array.isArray(allow) ? allow : [allow];
+
+  // prefer context helper if available
+  const ok =
+    typeof hasAnyGroup === "function"
+      ? hasAnyGroup(...allowed)
+      : (() => {
+          const mine = Array.isArray(user.userGroups)
+            ? user.userGroups.map(normalizeGroup)
+            : [];
+          const want = allowed.map(normalizeGroup);
+          return want.some((g) => mine.includes(g));
+        })();
+
+  if (!ok) {
+    return <Navigate to="/403" replace state={{ from: location }} />;
   }
 
   return <Outlet />;

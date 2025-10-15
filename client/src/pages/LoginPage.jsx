@@ -10,13 +10,20 @@ const LoginPage = () => {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
+  // helper: does the user have "admin" among userGroups?
+  const isAdmin = (u) =>
+    !!u &&
+    Array.isArray(u.userGroups) &&
+    u.userGroups.map((g) =>
+      String(g || "").trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_")
+    ).includes("admin");
+
   useEffect(() => {
-    console.log('isAuthenticated changed:', isAuthenticated);
-    if (isAuthenticated) {
-      if (user?.userGroup === 'admin') {
-        navigate("/usermanage");
+    if (isAuthenticated && user?.username) {
+      if (isAdmin(user)) {
+        navigate("/usermanage", { replace: true });
       } else {
-        navigate("/applications");
+        navigate("/applications", { replace: true });
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -38,59 +45,63 @@ const LoginPage = () => {
 
     try {
       await login(username, password);
+      // redirect handled by useEffect
     } catch (err) {
-      setErrors([`${err}`]);
+      const msg = err?.message || "Login failed. Please check your credentials.";
+      setErrors([msg]);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-      <div className="flex flex-col flex-auto justify-center items-center min-h-0 overflow-auto">
-        <form className="flex flex-col flex-initial" onSubmit={handleSubmit} noValidate >
-          <h1 className="text-2xl font-medium mb-4">Sign in</h1>
-          <div style={{display: 'flex',flexDirection: 'column'}}>
-            <label className="" htmlFor="username">Username</label>
-            <input
-              id="username"
-              className="border-2 border-black rounded-md text-sm"
-              type="text"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={loading}
-              required
-            />
+    <div className="flex flex-col flex-auto justify-center items-center min-h-0 overflow-auto">
+      <form className="flex flex-col flex-initial" onSubmit={handleSubmit} noValidate>
+        <h1 className="text-2xl font-medium mb-4">Sign in</h1>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <label htmlFor="username">Username</label>
+          <input
+            id="username"
+            className="border-2 border-black rounded-md text-sm"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={loading}
+            required
+          />
 
-            <label className="label" htmlFor="password" style={{marginTop: '10px'}}>Password</label>
-            <input
-              id="password"
-              className="border-2 border-black rounded-md text-sm"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              required
-            />
+          <label htmlFor="password" style={{ marginTop: "10px" }}>
+            Password
+          </label>
+          <input
+            id="password"
+            className="border-2 border-black rounded-md text-sm"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            required
+          />
 
-            <button className="my-8 bg-gray-300 self-center px-8 py-1 rounded-md" type="submit" disabled={loading}>
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
-
-          </div>
-        </form>
-        <div className="flex text-sm justify-center font-medium text-red-500" aria-live="polite">
-          {errors.length > 0 && (
-            <ul>
-              {errors.map((msg, i) => (
-                <li key={i}>{msg}</li>
-              ))}
-            </ul>
-          )}
+          <button className="my-8 bg-gray-300 self-center px-8 py-1 rounded-md" type="submit" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
         </div>
+      </form>
+
+      <div className="flex text-sm justify-center font-medium text-red-500" aria-live="polite">
+        {errors.length > 0 && (
+          <ul>
+            {errors.map((msg, i) => (
+              <li key={i}>{msg}</li>
+            ))}
+          </ul>
+        )}
       </div>
+    </div>
   );
-}
+};
 
 export default LoginPage;

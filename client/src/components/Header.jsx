@@ -36,17 +36,15 @@ export default function HeaderPage() {
 
   const handleProfile = () => {
     setOpen(false);
-    const id = user?.id;
-    navigate(id ? `/user/${id}` : "/user/me");
+    const username = user?.username;
+    navigate(username ? `/user/${username}` : "/user/me");
   };
 
   return (
     <header className="w-full border-b-4 border-black">
-      {/* Flex container keeps title and avatar vertically centered */}
       <div className="mx-auto flex items-center justify-between px-6 py-3">
         <h2 className="text-2xl font-medium">Task Management System</h2>
 
-        {/* Avatar + menu anchor */}
         <div className="relative">
           <button
             ref={btnRef}
