@@ -40,6 +40,11 @@ export default function HeaderPage() {
     navigate(username ? `/user/${username}` : "/user/me");
   };
 
+  const handleUserManagement = () => {
+    setOpen(false);
+    navigate("/usermanage");
+  }
+
   return (
     <header className="w-full border-b-4 border-black">
       <div className="mx-auto flex items-center justify-between px-6 py-3">
@@ -77,6 +82,16 @@ export default function HeaderPage() {
               aria-orientation="vertical"
               className="absolute right-0 mt-3 w-56 rounded-lg shadow-md bg-purple-200 p-2"
             >
+              {user?.userGroups?.includes("admin") && (
+                <button
+                  type="button"
+                  onClick={handleUserManagement}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  role="menuitem"
+                >
+                  User Management
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleProfile}
