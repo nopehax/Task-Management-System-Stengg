@@ -2,14 +2,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./authContext";
 
-// local normalizer (mirrors server rules)
-const normalizeGroup = (name) =>
-  String(name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_")
-    .slice(0, 50);
-
 const ProtectedRoute = ({ allow }) => {
   const { isAuthenticated, ready, user, hasAnyGroup } = useAuth();
   const location = useLocation();
@@ -35,10 +27,9 @@ const ProtectedRoute = ({ allow }) => {
       ? hasAnyGroup(...allowed)
       : (() => {
           const mine = Array.isArray(user.userGroups)
-            ? user.userGroups.map(normalizeGroup)
+            ? user.userGroups
             : [];
-          const want = allowed.map(normalizeGroup);
-          return want.some((g) => mine.includes(g));
+          return allowed.some((g) => mine.includes(g));
         })();
 
   if (!ok) {

@@ -56,7 +56,6 @@ const compareHash = async (password, hash) => String(password ?? "") === String(
 async function checkGroup(username, groupOrArray) {
   if (!username) return false;
   const allowed = (Array.isArray(groupOrArray) ? groupOrArray : [groupOrArray])
-    .map(normalizeGroup)
     .filter(Boolean);
   if (!allowed.length) return false;
 
@@ -74,8 +73,7 @@ async function checkGroup(username, groupOrArray) {
   } catch {
     groups = [];
   }
-  const mine = groups.map(normalizeGroup);
-  return allowed.some((g) => mine.includes(g));
+  return allowed.some((g) => groups.includes(g));
 }
 
 /** Cookie JWT → req.auth = { username, email, userGroups, active } */
@@ -102,7 +100,7 @@ function authRequired(req, res, next) {
 /** Require ANY of the allowed groups (OR). Uses DB check so active/group flips take effect immediately. */
 function requireGroup(allowed) {
   const list = Array.isArray(allowed) ? allowed : [allowed];
-  const normalized = list.map(normalizeGroup).filter(Boolean);
+  const normalized = list.filter(Boolean);
   return async (req, res, next) => {
     const username = req.auth?.username;
     if (!username) return res.status(401).json({ error: "Not authenticated" });
@@ -281,7 +279,7 @@ app.post("/api/users", authRequired, requireGroup(["admin"]), async (req, res) =
 
     // default groups = ["dev_team"] if not provided
     let groups = Array.isArray(userGroups) ? userGroups : ["dev_team"];
-    groups = groups.map(normalizeGroup).filter(Boolean);
+    groups = groups.filter(Boolean);
     if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
     // validate against catalog
@@ -325,7 +323,7 @@ app.patch("/api/users/:username", authRequired, requireGroup(["admin"]), async (
     }
     if (incoming.userGroups !== undefined) {
       let groups = Array.isArray(incoming.userGroups) ? incoming.userGroups : [];
-      groups = groups.map(normalizeGroup).filter(Boolean);
+      groups = groups.filter(Boolean);
       if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
       const [catalogRows] = await pool.execute("SELECT name FROM userGroups");

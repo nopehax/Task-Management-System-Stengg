@@ -2,16 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 
-/** normalize to snake_case, max 50 chars, allow a-z 0-9 _ . - */
-export function normalizeGroupName(name) {
-  if (typeof name !== "string") return "";
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_")
-    .slice(0, 50);
-}
-
 export default function ChipsMultiSelect({
   options = [],          // array of strings (snake_case)
   value = [],            // array of strings (snake_case)
@@ -36,11 +26,11 @@ export default function ChipsMultiSelect({
   });
 
   const normalizedOptions = useMemo(
-    () => Array.from(new Set(options.map(normalizeGroupName))).sort(),
+    () => Array.from(new Set(options)).sort(),
     [options]
   );
   const normalizedValue = useMemo(
-    () => Array.from(new Set((value || []).map(normalizeGroupName))),
+    () => Array.from(new Set((value || []))),
     [value]
   );
 
@@ -107,12 +97,11 @@ export default function ChipsMultiSelect({
 
   function toggleOption(opt) {
     if (disabled) return;
-    const nv = normalizeGroupName(opt);
     let out;
-    if (normalizedValue.includes(nv)) {
-      out = normalizedValue.filter((g) => g !== nv);
+    if (normalizedValue.includes(opt)) {
+      out = normalizedValue.filter((g) => g !== opt);
     } else {
-      out = [...normalizedValue, nv];
+      out = [...normalizedValue, opt];
     }
     onChange?.(out);
   }

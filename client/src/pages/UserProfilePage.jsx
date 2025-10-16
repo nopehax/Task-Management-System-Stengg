@@ -10,14 +10,6 @@ const api = axios.create({
   headers: { Accept: "application/json" },
 });
 
-// mirror server normalizer (for display consistency if needed)
-const normalizeGroup = (name) =>
-  String(name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_")
-    .slice(0, 50);
-
 export default function UserProfilePage() {
   // expects user shape: { username, email, userGroups: string[], active }
   const { user, ready } = useAuth();
@@ -125,7 +117,7 @@ export default function UserProfilePage() {
   }
 
   const groups = Array.isArray(user.userGroups)
-    ? user.userGroups.map(normalizeGroup)
+    ? user.userGroups
     : [];
 
   return (

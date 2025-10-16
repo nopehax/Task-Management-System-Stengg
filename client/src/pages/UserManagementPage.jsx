@@ -140,7 +140,7 @@ export default function UserManagementPage() {
       });
       const arr = Array.isArray(res.data) ? res.data : [];
       const mapped = arr.map((g) => (typeof g === "string" ? g : g.name)).filter(Boolean);
-      setGroups(mapped.map(normalizeGroup));
+      setGroups(mapped);
     } catch {
       setGroups([]);
     } finally {
@@ -277,7 +277,7 @@ export default function UserManagementPage() {
         username: newUser.username,
         email: newUser.email,
         password: newUser.password,
-        userGroups: (newUser.userGroups || []).map(normalizeGroup),
+        userGroups: newUser.userGroups || [],
         active: !!newUser.active,
       };
       const { data: created } = await axios.post("/api/users", payload, {
@@ -345,7 +345,7 @@ export default function UserManagementPage() {
     setGroupErr("");
     const normalized = normalizeGroup(newGroupName);
     if (!normalized) {
-      setGroupErr("Enter a valid snake_case group (a–z, 0–9, _ . -).");
+      setGroupErr("Enter a valid snake_case group (a-z, 0-9, _ . -).");
       return;
     }
     if (normalized.length > 50) {

@@ -9,14 +9,6 @@ const API_LOGIN  = "http://localhost:3000/api/login";
 const API_ME     = "http://localhost:3000/api/me";
 const API_LOGOUT = "http://localhost:3000/api/logout";
 
-// Client-side normalization to mirror server rules
-const normalizeGroup = (name) =>
-  String(name || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_")
-    .slice(0, 50);
-
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   // user shape: { username, email, userGroups: string[], active: boolean }
@@ -97,8 +89,8 @@ export const AuthProvider = ({ children }) => {
   const hasAnyGroup = useCallback((...allowed) => {
     if (!user || !Array.isArray(user.userGroups)) return false;
     if (!allowed || allowed.length === 0) return false;
-    const mine = user.userGroups.map(normalizeGroup);
-    return allowed.map(normalizeGroup).some((g) => mine.includes(g));
+    const mine = user.userGroups
+    return allowed.some((g) => mine.includes(g));
   }, [user]);
 
 
