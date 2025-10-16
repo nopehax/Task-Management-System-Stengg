@@ -10,17 +10,15 @@ const LoginPage = () => {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
-  // helper: does the user have "admin" among userGroups?
-  const isAdmin = (u) =>
+  const isOnlyAdmin = (u) =>
     !!u &&
     Array.isArray(u.userGroups) &&
-    u.userGroups.map((g) =>
-      String(g || "").trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_")
-    ).includes("admin");
+    u.userGroups.length === 1 &&
+    u.userGroups[0] === "admin";
 
   useEffect(() => {
     if (isAuthenticated && user?.username) {
-      if (isAdmin(user)) {
+      if (isOnlyAdmin(user)) {
         navigate("/usermanage", { replace: true });
       } else {
         navigate("/applications", { replace: true });
@@ -45,7 +43,6 @@ const LoginPage = () => {
 
     try {
       await login(username, password);
-      // redirect handled by useEffect
     } catch (err) {
       const msg = err?.message || "Login failed. Please check your credentials.";
       setErrors([msg]);

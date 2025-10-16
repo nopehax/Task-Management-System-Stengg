@@ -6,7 +6,6 @@ const ProtectedRoute = ({ allow }) => {
   const { isAuthenticated, ready, user, hasAnyGroup } = useAuth();
   const location = useLocation();
 
-  // Avoid flicker until /api/me finishes
   if (!ready) return null;
 
   if (!isAuthenticated || !user?.active) {

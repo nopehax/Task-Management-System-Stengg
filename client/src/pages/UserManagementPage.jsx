@@ -3,34 +3,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import HeaderPage from "../components/Header";
 import ChipsMultiSelect from "../components/ChipsMultiSelect";
+import SimpleToggle from "../components/SimpleToggle";
 
 axios.defaults.baseURL = "http://localhost:3000";
 axios.defaults.withCredentials = true;
 
-// Simple toggle UI
-function Toggle({ checked, onChange, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={() => !disabled && onChange && onChange(!checked)}
-      disabled={disabled}
-      className={[
-        "inline-flex h-6 w-11 items-center rounded-full transition",
-        checked ? "bg-emerald-600" : "bg-slate-300",
-        disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer",
-      ].join(" ")}
-      aria-pressed={checked}
-      aria-label="Toggle Active"
-    >
-      <span
-        className={[
-          "h-5 w-5 rounded-full bg-white shadow transform transition",
-          checked ? "translate-x-5" : "translate-x-1",
-        ].join(" ")}
-      />
-    </button>
-  );
-}
 
 // snake_case normalizer (mirror server)
 const normalizeGroup = (name) =>
@@ -126,7 +103,6 @@ export default function UserManagementPage() {
             active: !!u.active,
           },
         }));
-        normalized.sort((a, b) => a.username.localeCompare(b.username));
         setRows(normalized);
       } catch (e) {
         setPageError(
@@ -139,7 +115,7 @@ export default function UserManagementPage() {
     })();
   }, []);
 
-  // Fetch user groups on mount
+  // Fetch userGroup catalog on mount
   async function refreshGroups() {
     setGroupLoading(true);
     try {
@@ -269,7 +245,7 @@ export default function UserManagementPage() {
             r.username === row.username ? { ...r, savedTick: false } : r
           )
         );
-      }, 2000);
+      }, 5000);
     } catch (e) {
       setRows((prev) =>
         prev.map((r) =>
@@ -331,7 +307,7 @@ export default function UserManagementPage() {
       };
 
       setRows((prev) =>
-        [newRow, ...prev].sort((a, b) => a.username.localeCompare(b.username))
+        [newRow, ...prev]
       );
 
       // reset add row
@@ -350,7 +326,7 @@ export default function UserManagementPage() {
             r.username === newRow.username ? { ...r, savedTick: false } : r
           )
         );
-      }, 2000);
+      }, 5000);
     } catch (e) {
       setCreateErr(
         e?.response?.data?.error ||
@@ -366,7 +342,7 @@ export default function UserManagementPage() {
     setGroupErr("");
     const normalized = normalizeGroup(newGroupName);
     if (!normalized) {
-      setGroupErr("Try using snake_case if you're seeing this message.");
+      setGroupErr("Invalid group name.");
       return;
     }
     if (normalized.length > 50) {
@@ -382,7 +358,7 @@ export default function UserManagementPage() {
     try {
       await axios.post(
         "/api/usergroups",
-        { groupName: normalized }, // server expects { groupName }
+        { groupName: normalized },
         { headers: { "Content-Type": "application/json" } }
       );
       await refreshGroups();
@@ -505,7 +481,7 @@ export default function UserManagementPage() {
                   </td>
 
                   <td className="px-4 py-2">
-                    <Toggle
+                    <SimpleToggle
                       checked={newUser.active}
                       onChange={(v) => setNewUser((s) => ({ ...s, active: v }))}
                       disabled={creating}
@@ -593,7 +569,7 @@ export default function UserManagementPage() {
 
                       <td className="px-4 py-2">
                         {/* For admin row when not super-admin: show true + disabled */}
-                        <Toggle
+                        <SimpleToggle
                           checked={disabledRow ? true : r.active}
                           onChange={() => (disabledRow ? null : toggleActive(r))}
                           disabled={r.saving || disabledRow}
