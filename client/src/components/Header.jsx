@@ -28,6 +28,11 @@ export default function HeaderPage() {
     };
   }, [open]);
 
+  const handleHome = () => {
+    setOpen(false);
+    navigate("/");
+  }
+
   const handleLogout = async () => {
     setOpen(false);
     await logout();
@@ -80,8 +85,16 @@ export default function HeaderPage() {
               ref={menuRef}
               role="menu"
               aria-orientation="vertical"
-              className="absolute right-0 mt-3 w-56 rounded-lg shadow-md bg-purple-200 p-2"
+              className="absolute z-[999] right-0 mt-3 w-56 rounded-lg bg-purple-200 p-2"
             >
+              <button
+                type="button"
+                onClick={handleHome}
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                role="menuitem"
+              >
+                Home
+              </button>
               {user?.userGroups?.includes("admin") && (
                 <button
                   type="button"
