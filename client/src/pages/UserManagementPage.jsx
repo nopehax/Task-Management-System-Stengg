@@ -12,7 +12,7 @@ function Toggle({ checked, onChange, disabled }) {
   return (
     <button
       type="button"
-      onClick={() => onChange(!checked)}
+      onClick={() => !disabled && onChange && onChange(!checked)}
       disabled={disabled}
       className={[
         "inline-flex h-6 w-11 items-center rounded-full transition",
@@ -41,13 +41,14 @@ const normalizeGroup = (name) =>
     .slice(0, 50);
 
 export default function UserManagementPage() {
+  const [currentUser, setCurrentUser] = useState(null);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [groups, setGroups] = useState([]);
   const [groupLoading, setGroupLoading] = useState(false);
 
-  // NEW: inline add-group UI state
+  // inline add-group UI state
   const [newGroupName, setNewGroupName] = useState("");
   const [groupErr, setGroupErr] = useState("");
   const [groupAdding, setGroupAdding] = useState(false);
@@ -93,12 +94,19 @@ export default function UserManagementPage() {
     );
   };
 
-  // Load users on mount
+  // Load session + users on mount
   useEffect(() => {
     (async () => {
       setLoading(true);
       setPageError("");
       try {
+        // get current user
+        const me = await axios.get("/api/me", {
+          headers: { Accept: "application/json" },
+        });
+        setCurrentUser(me?.data?.user || null);
+
+        // get users
         const { data } = await axios.get("/api/users", {
           headers: { Accept: "application/json" },
         });
@@ -139,7 +147,9 @@ export default function UserManagementPage() {
         headers: { Accept: "application/json" },
       });
       const arr = Array.isArray(res.data) ? res.data : [];
-      const mapped = arr.map((g) => (typeof g === "string" ? g : g.name)).filter(Boolean);
+      const mapped = arr
+        .map((g) => (typeof g === "string" ? g : g.name))
+        .filter(Boolean);
       setGroups(mapped);
     } catch {
       setGroups([]);
@@ -147,14 +157,18 @@ export default function UserManagementPage() {
       setGroupLoading(false);
     }
   }
-  useEffect(() => { refreshGroups(); }, []);
+  useEffect(() => {
+    refreshGroups();
+  }, []);
 
   const validateRow = (r, isNew = false) => {
     if (!r.username?.trim()) return "Username is required.";
     if (!r.email?.trim()) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
 
-    const selected = Array.isArray(r.userGroups) ? r.userGroups.map(normalizeGroup) : [];
+    const selected = Array.isArray(r.userGroups)
+      ? r.userGroups.map(normalizeGroup)
+      : [];
     if (selected.length === 0) return "At least one group is required.";
 
     // Must all exist in catalog
@@ -165,14 +179,19 @@ export default function UserManagementPage() {
     // Password policy 8–10 (only required for create)
     if (isNew) {
       if (!r.password || r.password.length < 8 || r.password.length > 10)
-        return "Password must be 8–10 characters.";
+        return "Password must be 8-10 characters.";
     } else if (r.password && (r.password.length < 8 || r.password.length > 10)) {
-      return "Password must be 8–10 characters.";
+      return "Password must be 8-10 characters.";
     }
     return "";
   };
 
   const saveRow = async (row) => {
+    const isAdminRow = row.username === "admin";
+    const isSuperAdmin = (currentUser?.username || "") === "admin";
+    const disabledRow = isAdminRow && !isSuperAdmin;
+    if (disabledRow) return; // no-op for safety
+
     const err = validateRow(row, false);
     setRows((prev) =>
       prev.map((r) => (r.username === row.username ? { ...r, rowErr: err } : r))
@@ -235,7 +254,9 @@ export default function UserManagementPage() {
           merged.__orig = {
             username: merged.username,
             email: merged.email,
-            userGroups: Array.isArray(merged.userGroups) ? merged.userGroups : [],
+            userGroups: Array.isArray(merged.userGroups)
+              ? merged.userGroups
+              : [],
             active: !!merged.active,
           };
           return merged;
@@ -289,7 +310,7 @@ export default function UserManagementPage() {
         email: created.email ?? newUser.email,
         userGroups: Array.isArray(created.userGroups)
           ? created.userGroups
-          : (newUser.userGroups || []),
+          : newUser.userGroups || [],
         active:
           typeof created.active === "boolean" ? created.active : newUser.active,
         password: "",
@@ -301,7 +322,7 @@ export default function UserManagementPage() {
           email: created.email ?? newUser.email,
           userGroups: Array.isArray(created.userGroups)
             ? created.userGroups
-            : (newUser.userGroups || []),
+            : newUser.userGroups || [],
           active:
             typeof created.active === "boolean"
               ? created.active
@@ -340,12 +361,12 @@ export default function UserManagementPage() {
     }
   };
 
-  // NEW: inline add-group (input + button)
+  // inline add-group (input + button)
   const addNewGroup = async () => {
     setGroupErr("");
     const normalized = normalizeGroup(newGroupName);
     if (!normalized) {
-      setGroupErr("Enter a valid snake_case group (a-z, 0-9, _ . -).");
+      setGroupErr("Try using snake_case if you're seeing this message.");
       return;
     }
     if (normalized.length > 50) {
@@ -395,7 +416,7 @@ export default function UserManagementPage() {
                 <th className="text-left px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span>Groups</span>
-                    {/* NEW: inline add-group input + button */}
+                    {/* inline add-group input + button */}
                     <input
                       type="text"
                       value={newGroupName}
@@ -512,82 +533,98 @@ export default function UserManagementPage() {
               )}
 
               {/* Existing users */}
-              {rows.map((r, idx) => (
-                <React.Fragment key={r.username}>
-                  <tr className={idx % 2 ? "bg-slate-50/50" : "bg-white"}>
-                    <td className="px-4 py-2">
-                      {/* Username is immutable (disabled) */}
-                      <input
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-300 text-slate-500"
-                        value={r.username}
-                        onChange={() => {}}
-                        disabled
-                      />
-                    </td>
+              {rows.map((r, idx) => {
+                const isAdminRow = r.username === "admin";
+                const isSuperAdmin = (currentUser?.username || "") === "admin";
+                const disabledRow = isAdminRow && !isSuperAdmin;
 
-                    <td className="px-4 py-2">
-                      <ChipsMultiSelect
-                        options={groups}
-                        value={r.userGroups}
-                        disabled={r.saving}
-                        onChange={(arr) =>
-                          setField(r.username, "userGroups", arr)
-                        }
-                        placeholder="Select groups…"
-                      />
-                    </td>
+                return (
+                  <React.Fragment key={r.username}>
+                    <tr className={idx % 2 ? "bg-slate-50/50" : "bg-white"}>
+                      <td className="px-4 py-2">
+                        {/* Username is immutable (disabled) */}
+                        <input
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-300 text-slate-500"
+                          value={r.username}
+                          onChange={() => {}}
+                          disabled
+                        />
+                      </td>
 
-                    <td className="px-4 py-2">
-                      <input
-                        type="email"
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-                        value={r.email}
-                        onChange={(e) =>
-                          setField(r.username, "email", e.target.value)
-                        }
-                      />
-                    </td>
+                      <td className="px-4 py-2">
+                        <ChipsMultiSelect
+                          options={groups}
+                          value={r.userGroups}
+                          disabled={r.saving || disabledRow}
+                          onChange={(arr) =>
+                            !disabledRow &&
+                            setField(r.username, "userGroups", arr)
+                          }
+                          placeholder="Select groups…"
+                        />
+                      </td>
 
-                    <td className="px-4 py-2">
-                      <input
-                        type="password"
-                        placeholder="(leave blank to keep)"
-                        className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-                        value={r.password}
-                        onChange={(e) =>
-                          setField(r.username, "password", e.target.value)
-                        }
-                      />
-                    </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="email"
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                          value={r.email}
+                          onChange={(e) =>
+                            !disabledRow &&
+                            setField(r.username, "email", e.target.value)
+                          }
+                          disabled={disabledRow}
+                        />
+                      </td>
 
-                    <td className="px-4 py-2">
-                      <Toggle
-                        checked={r.active}
-                        onChange={() => toggleActive(r)}
-                        disabled={r.saving}
-                      />
-                    </td>
+                      <td className="px-4 py-2">
+                        <input
+                          type="password"
+                          placeholder="(leave blank to keep)"
+                          className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                          value={r.password}
+                          onChange={(e) =>
+                            !disabledRow &&
+                            setField(r.username, "password", e.target.value)
+                          }
+                          disabled={disabledRow}
+                        />
+                      </td>
 
-                    <td className="px-4 py-2">
-                      <button
-                        className="rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full"
-                        disabled={r.saving}
-                        onClick={() => saveRow(r)}
-                      >
-                        {r.saving ? "Saving…" : r.savedTick ? "✓ Saved" : "Save"}
-                      </button>
-                    </td>
-                  </tr>
+                      <td className="px-4 py-2">
+                        {/* For admin row when not super-admin: show true + disabled */}
+                        <Toggle
+                          checked={disabledRow ? true : r.active}
+                          onChange={() => (disabledRow ? null : toggleActive(r))}
+                          disabled={r.saving || disabledRow}
+                        />
+                      </td>
 
-                  {r.rowErr && (
-                    <tr>
-                      <td colSpan={6} className="px-4 pt-1 pb-2 text-red-600">
-                        {r.rowErr}
+                      <td className="px-4 py-2">
+                        <button
+                          className="rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full"
+                          disabled={r.saving || disabledRow}
+                          onClick={() => saveRow(r)}
+                        >
+                          {r.saving
+                            ? "Saving…"
+                            : r.savedTick
+                            ? "✓ Saved"
+                            : "Save"}
+                        </button>
                       </td>
                     </tr>
-                  )}
-                </React.Fragment>
-              ))}
+
+                    {r.rowErr && (
+                      <tr>
+                        <td colSpan={6} className="px-4 pt-1 pb-2 text-red-600">
+                          {r.rowErr}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
