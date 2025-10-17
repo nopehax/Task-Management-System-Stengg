@@ -27,18 +27,15 @@ export const AuthProvider = ({ children }) => {
           if (me && me.username && Array.isArray(me.userGroups) && me.active) {
             setIsAuthenticated(true);
             setUser(me);
-            localStorage.setItem("authUser", JSON.stringify(me));
           } else {
             setIsAuthenticated(false);
             setUser(null);
-            localStorage.removeItem("authUser");
           }
         }
       } catch {
         if (!cancelled) {
           setIsAuthenticated(false);
           setUser(null);
-          localStorage.removeItem("authUser");
         }
       } finally {
         if (!cancelled) setReady(true);
@@ -60,7 +57,6 @@ export const AuthProvider = ({ children }) => {
       if (me && me.username && Array.isArray(me.userGroups) && me.active) {
         setIsAuthenticated(true);
         setUser(me);
-        localStorage.setItem("authUser", JSON.stringify(me));
       } else {
         // Defensive: treat missing/invalid shape as failure
         throw new Error("Login failed. Please check your credentials.");
@@ -81,7 +77,6 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsAuthenticated(false);
       setUser(null);
-      localStorage.removeItem("authUser");
     }
   };
 
