@@ -61,17 +61,17 @@ function requireGroup(allowed) {
 
 // Issue JWT cookie with new payload
 function issueToken(res, payload) {
-  const token = jwt.sign(payload, process.env.JWT_SECRET || "dev-secret", {
+  const jwtToken = jwt.sign(payload, process.env.JWT_SECRET || "dev-secret", {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
   });
-  res.cookie("token", token, {
+  res.cookie("token", jwtToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: null,
     path: "/",
   });
-  return token;
+  return jwtToken;
 }
 
 module.exports = {
