@@ -164,7 +164,6 @@ export default function UserManagementPage() {
     const isAdminRow = row.username === "admin";
     const isSuperAdmin = (currentUser?.username || "") === "admin";
     const disabledRow = isAdminRow && !isSuperAdmin;
-    if (disabledRow) return; // no-op for safety
 
     const err = validateRow(row, false);
     setRows((prev) =>
@@ -518,7 +517,9 @@ export default function UserManagementPage() {
                       <td className="px-4 py-2">
                         {/* Username is immutable (disabled) */}
                         <input
-                          className="w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-300 text-slate-500"
+                          className={["w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-150 text-slate-500",
+                            disabledRow ? "cursor-not-allowed" : "cursor-default"
+                          ].join(" ")}
                           value={r.username}
                           onChange={() => {}}
                           disabled
@@ -529,9 +530,9 @@ export default function UserManagementPage() {
                         <ChipsMultiSelect
                           options={groups}
                           value={r.userGroups}
-                          disabled={r.saving || disabledRow}
+                          disabled={r.saving}
+                          disabledOptions={disabledRow ? ["admin"] : []}
                           onChange={(arr) =>
-                            !disabledRow &&
                             setField(r.username, "userGroups", arr)
                           }
                           placeholder="Select groups…"
@@ -541,7 +542,9 @@ export default function UserManagementPage() {
                       <td className="px-4 py-2">
                         <input
                           type="email"
-                          className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                          className={["w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                            , disabledRow ? "cursor-not-allowed" : "cursor-pointer"
+                          ].join(" ")}
                           value={r.email}
                           onChange={(e) =>
                             !disabledRow &&
@@ -555,7 +558,9 @@ export default function UserManagementPage() {
                         <input
                           type="password"
                           placeholder="(leave blank to keep)"
-                          className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                          className={["w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500",
+                            disabledRow ? "cursor-not-allowed" : "cursor-pointer"
+                          ].join(" ")}
                           value={r.password}
                           onChange={(e) =>
                             !disabledRow &&
@@ -577,7 +582,7 @@ export default function UserManagementPage() {
                       <td className="px-4 py-2">
                         <button
                           className="rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full"
-                          disabled={r.saving || disabledRow}
+                          disabled={r.saving}
                           onClick={() => saveRow(r)}
                         >
                           {r.saving

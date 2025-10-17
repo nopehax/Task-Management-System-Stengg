@@ -3,14 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 
 export default function ChipsMultiSelect({
-  options = [],          // array of strings (snake_case)
-  value = [],            // array of strings (snake_case)
+  options = [],          // array of strings
+  value = [],            // array of strings
   onChange,              // (arr) => void
   placeholder = "Select groups…",
   disabled = false,
   errorText = "",
   maxMenuHeight = 240,   // desired max list height (will clamp to viewport)
-  id = "chips-multiselect"
+  id = "chips-multiselect",
+  disabledOptions = [],  // array of strings
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);    // wraps the trigger
@@ -32,6 +33,10 @@ export default function ChipsMultiSelect({
   const normalizedValue = useMemo(
     () => Array.from(new Set((value || []))),
     [value]
+  );
+  const diabledSet = useMemo(
+    () => new Set((disabledOptions || [])),
+    [disabledOptions]
   );
 
   // Close on outside click (acknowledging the portal menu)
@@ -130,14 +135,18 @@ export default function ChipsMultiSelect({
         )}
         {normalizedOptions.map((opt) => {
           const selected = normalizedValue.includes(opt);
+          const isDisabled = diabledSet.has(opt);
           return (
             <div
               key={opt}
               role="option"
               aria-selected={selected}
-              onClick={() => toggleOption(opt)}
+              aria-disabled={isDisabled}
+              onClick={() => !isDisabled && toggleOption(opt)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") toggleOption(opt);
+                if (isDisabled) return;
+                if (e.key === "Enter" || e.key === " ") 
+                  toggleOption(opt);
               }}
               tabIndex={0}
               style={{
@@ -145,11 +154,13 @@ export default function ChipsMultiSelect({
                 alignItems: "center",
                 gap: 10,
                 padding: "10px 12px",
-                cursor: "pointer",
+                cursor: isDisabled ? "not-allowed" : "pointer",
+                opacity: isDisabled ? 0.5 : 1,
                 background: selected ? "#f0f7ff" : "transparent",
               }}
+              title={isDisabled ? "This option is disabled" : undefined}
             >
-              <input type="checkbox" checked={selected} readOnly />
+              <input type="checkbox" checked={selected} readOnly disabled={isDisabled}/>
               <span>{opt}</span>
             </div>
           );

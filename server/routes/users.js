@@ -92,6 +92,9 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
     if (incoming.userGroups !== undefined) {
       let groups = Array.isArray(incoming.userGroups) ? incoming.userGroups : [];
       groups = groups.filter(Boolean);
+      if (username === "admin" && !groups.includes("admin")) {
+        return res.status(400).json({ error: "Cannot remove admin rights from this user" });
+      }
       if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
       const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
