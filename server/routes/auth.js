@@ -7,7 +7,7 @@ const { authRequired, issueToken } = require('../middleware/auth');
 
 const compareHash = async (password, hash) => bcrypt.compare(password, hash);
 
-// --- Login: returns { username, email, userGroups[], active } on success ---
+// Login: returns { username, email, userGroups[], active } on success
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -50,7 +50,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// --- Session: verify cookie, re-check active, return fresh data ---
+// Session: verify cookie, re-check active, return fresh data
 router.get('/me', authRequired, async (req, res) => {
   try {
     const username = req.auth.username;
@@ -82,7 +82,7 @@ router.get('/me', authRequired, async (req, res) => {
   }
 });
 
-// --- Logout ---
+// Logout
 router.post('/logout', (_req, res) => {
   res.clearCookie("token", { path: "/" });
   res.json({ ok: true });

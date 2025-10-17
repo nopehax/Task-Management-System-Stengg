@@ -16,7 +16,7 @@ const normalizeStr = (name) => name.trim().toLowerCase();
 const getHash = async (password) => await bcrypt.hash(password, 12);
 const compareHash = async (password, hash) => bcrypt.compare(password, hash);
 
-// --- Admin: get userList ---
+// Admin: get userList
 router.get('/users', authRequired, requireGroup(['admin']), async (_req, res) => {
   try {
     const [rows] = await pool.execute(
@@ -34,7 +34,7 @@ router.get('/users', authRequired, requireGroup(['admin']), async (_req, res) =>
   }
 });
 
-// --- Admin: create new user ---
+// Admin: create new user
 router.post('/users', authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const { username, email, password, userGroups, active = 1 } = req.body || {};
@@ -72,7 +72,7 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
   }
 });
 
-// --- Admin: update user by :username (email/password/active/userGroups) ---
+// Admin: update user by :username (email/password/active/userGroups)
 router.patch('/users/:username', authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const username = normalizeStr(req.params.username);
@@ -132,7 +132,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
   }
 });
 
-// --- Self profile: update own email/password only ---
+// Self profile: update own email/password only
 router.patch('/user/:username',
   authRequired, async (req, res) => {
     try {

@@ -11,7 +11,7 @@ function normalizeGroup(name) {
   return name.trim().toLowerCase().slice(0, 50);
 }
 
-// --- get userGroups catalog ---
+// get userGroups catalog
 router.get('/usergroups', authRequired, async (_req, res) => {
   try {
     const [rows] = await pool.execute("SELECT name FROM userGroups ORDER BY name ASC");
@@ -22,7 +22,7 @@ router.get('/usergroups', authRequired, async (_req, res) => {
   }
 });
 
-// --- add new userGroup to catalog ---
+// add new userGroup to catalog
 router.post('/usergroups', authRequired, requireGroup(['admin']), async (req, res) => {
   try {
     const raw = req.body?.groupName;

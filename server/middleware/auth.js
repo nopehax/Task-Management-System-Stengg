@@ -2,7 +2,7 @@
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/db');
 
-/** true iff user exists, active=1, and has ANY of the groups */
+// true iff user exists, active=1, and has ANY of the groups
 async function checkGroup(username, groupOrArray) {
   if (!username) return false;
   const allowed = (Array.isArray(groupOrArray) ? groupOrArray : [groupOrArray]).filter(Boolean);
@@ -25,7 +25,7 @@ async function checkGroup(username, groupOrArray) {
   return allowed.some((g) => groups.includes(g));
 }
 
-/** Cookie JWT → req.auth = { username, email, userGroups, active } */
+// Cookie JWT → req.auth = { username, email, userGroups, active }
 function authRequired(req, res, next) {
   const token = req.cookies?.token;
   if (!token) return res.status(401).json({ error: "Not authenticated" });
@@ -46,7 +46,7 @@ function authRequired(req, res, next) {
   }
 }
 
-/** allowedGroups filter middleware for endpoints */
+// allowedGroups filter middleware for endpoints
 function requireGroup(allowed) {
   const list = Array.isArray(allowed) ? allowed : [allowed];
   const normalized = list.filter(Boolean);
@@ -59,7 +59,7 @@ function requireGroup(allowed) {
   };
 }
 
-/** Issue JWT cookie with new payload */
+// Issue JWT cookie with new payload
 function issueToken(res, payload) {
   const token = jwt.sign(payload, process.env.JWT_SECRET || "dev-secret", {
     expiresIn: process.env.JWT_EXPIRES_IN || "1d",
