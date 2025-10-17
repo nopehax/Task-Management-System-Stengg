@@ -87,6 +87,9 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
       sets.push("`email` = ?"); values.push(incoming.email);
     }
     if (incoming.active !== undefined) {
+      if (username === "admin" && !incoming.active) {
+        return res.status(400).json({ error: "Cannot deactivate the admin user" });
+      }
       sets.push("`active` = ?"); values.push(incoming.active ? 1 : 0);
     }
     if (incoming.userGroups !== undefined) {
