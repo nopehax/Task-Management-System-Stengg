@@ -25,12 +25,13 @@ CREATE TABLE accounts (
 -- Seed catalog groups
 INSERT INTO userGroups (name) VALUES
   ('admin'),
-  ('project_lead'),
-  ('project_manager'),
-  ('dev_team');
+  ('project lead'),
+  ('project manager'),
+  ('dev team');
 
 -- Seed users
 INSERT INTO accounts (username, email, password, active, userGroups) VALUES
-  ('admin', 'admin@example.com', 'admin', 1, '["admin"]'),
-  ('pm',    'pm@example.com',    'pm',    1, '["project_manager"]'),
-  ('user',  'user@example.com',  'user',  1, '["dev_team"]');
+  ('admin', 'admin@example.com', '$2b$10$l3yNCDOT0h70PD9TRhDKLepx6kR5q7BLQTT/4w8dmnz8zKBFgQsJm', 1, '["admin"]'),
+  ('pm',    'pm@example.com',    '$2b$10$mGy56GwtDPtNCH6//jgA8.y2Uv/w/.CNZAhFjiWVaEiItHjXSPoUm',    1, '["project manager"]'),
+  ('user',  'user@example.com',  '$2b$10$JVZimuEKi1ShfrK/n.xFz.iZYEZxT/K6YQtvGJ5wjxCn5IU8Ss49u',  1, '["dev team"]'),
+  ('inactive', 'null@null.com', '$2b$12$JC407angGDbdviFYAgefXed8evLSrx5zMbInSyunzALggKjLUa0Ei', 0, '["dev team"]');

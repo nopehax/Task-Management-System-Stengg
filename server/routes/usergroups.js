@@ -5,10 +5,10 @@ const router = express.Router();
 const { pool } = require('../config/db');
 const { authRequired, requireGroup } = require('../middleware/auth');
 
-/** snake_case, max 50 char */
+/** lowercase, max 50 char */
 function normalizeGroup(name) {
   if (typeof name !== "string") return "";
-  return name.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 50);
+  return name.trim().toLowerCase().slice(0, 50);
 }
 
 // --- get userGroups catalog ---

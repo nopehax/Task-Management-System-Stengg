@@ -12,6 +12,7 @@ const isValidPass = (password) => {
   return /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};':",.<>\/?]+$/.test(pw);
 };
 
+const normalizeStr = (name) => name.trim().toLowerCase();
 const getHash = async (password) => await bcrypt.hash(password, 12);
 const compareHash = async (password, hash) => bcrypt.compare(password, hash);
 
@@ -74,7 +75,7 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
 // --- Admin: update user by :username (email/password/active/userGroups) ---
 router.patch('/users/:username', authRequired, requireGroup(['admin']), async (req, res) => {
   try {
-    const username = req.params.username;
+    const username = normalizeStr(req.params.username);
     if (!username) return res.status(400).json({ error: "Invalid username" });
     const incoming = req.body || {};
 

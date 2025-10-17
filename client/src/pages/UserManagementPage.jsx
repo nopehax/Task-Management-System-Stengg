@@ -9,12 +9,10 @@ axios.defaults.baseURL = "http://localhost:3000";
 axios.defaults.withCredentials = true;
 
 
-// snake_case normalizer (mirror server)
-const normalizeGroup = (name) =>
+const normalizeStr = (name) =>
   String(name || "")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_")
     .slice(0, 50);
 
 export default function UserManagementPage() {
@@ -36,7 +34,7 @@ export default function UserManagementPage() {
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
-    userGroups: ["dev_team"],
+    userGroups: ["dev team"],
     password: "",
     active: true,
   });
@@ -143,7 +141,7 @@ export default function UserManagementPage() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
 
     const selected = Array.isArray(r.userGroups)
-      ? r.userGroups.map(normalizeGroup)
+      ? r.userGroups.map(normalizeStr)
       : [];
     if (selected.length === 0) return "At least one group is required.";
 
@@ -180,9 +178,9 @@ export default function UserManagementPage() {
     for (const k of allowed) {
       const prevVal = row.__orig ? row.__orig[k] : undefined;
       if (k === "userGroups") {
-        const a = JSON.stringify((row[k] || []).map(normalizeGroup));
-        const b = JSON.stringify((prevVal || []).map(normalizeGroup));
-        if (a !== b) diff[k] = (row[k] || []).map(normalizeGroup);
+        const a = JSON.stringify((row[k] || []).map(normalizeStr));
+        const b = JSON.stringify((prevVal || []).map(normalizeStr));
+        if (a !== b) diff[k] = (row[k] || []).map(normalizeStr);
       } else if (row[k] !== prevVal) {
         diff[k] = row[k];
       }
@@ -271,7 +269,7 @@ export default function UserManagementPage() {
     setCreating(true);
     try {
       const payload = {
-        username: newUser.username,
+        username: normalizeStr(newUser.username),
         email: newUser.email,
         password: newUser.password,
         userGroups: newUser.userGroups || [],
@@ -314,7 +312,7 @@ export default function UserManagementPage() {
       setNewUser({
         username: "",
         email: "",
-        userGroups: ["dev_team"],
+        userGroups: ["dev team"],
         password: "",
         active: true,
       });
@@ -340,7 +338,7 @@ export default function UserManagementPage() {
   // inline add-group (input + button)
   const addNewGroup = async () => {
     setGroupErr("");
-    const normalized = normalizeGroup(newGroupName);
+    const normalized = normalizeStr(newGroupName);
     if (!normalized) {
       setGroupErr("Invalid group name.");
       return;
@@ -403,7 +401,7 @@ export default function UserManagementPage() {
                       onKeyDown={(e) => {
                         if (e.key === "Enter") addNewGroup();
                       }}
-                      placeholder="new_group"
+                      placeholder="new group"
                       className="h-8 w-40 rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-blue-500"
                       maxLength={50}
                     />
