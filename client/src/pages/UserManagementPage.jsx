@@ -110,6 +110,7 @@ export default function UserManagementPage() {
             active: !!u.active,
           },
         }));
+        normalized.sort((a, b) => Number(b.username === "admin") - Number(a.username === "admin"));
         setRows(normalized);
       } catch (e) {
         setPageError(
