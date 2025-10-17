@@ -15,6 +15,15 @@ const normalizeStr = (name) =>
     .toLowerCase()
     .slice(0, 50);
 
+const rowChanged = (row) => {
+  if (!row.__orig) return false;
+  if (row.email !== row.__orig.email) return true;
+  if (!!row.active !== !!row.__orig.active) return true;
+  if (JSON.stringify((row.userGroups || [])) !== JSON.stringify((row.__orig.userGroups || []))) return true;
+  if (row.password && row.password.length > 0) return true;
+  return false;
+}
+
 export default function UserManagementPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [rows, setRows] = useState([]);
@@ -185,17 +194,6 @@ export default function UserManagementPage() {
       }
     }
     if (row.password) diff.password = row.password;
-
-    if (Object.keys(diff).length === 0) {
-      setRows((prev) =>
-        prev.map((r) =>
-          r.username === row.username
-            ? { ...r, rowErr: "No changes to save." }
-            : r
-        )
-      );
-      return;
-    }
 
     setRows((prev) =>
       prev.map((r) =>
@@ -510,6 +508,7 @@ export default function UserManagementPage() {
                 const isAdminRow = r.username === "admin";
                 const isSuperAdmin = (currentUser?.username || "") === "admin";
                 const disabledRow = isAdminRow && !isSuperAdmin;
+                const canSave =  !r.saving && rowChanged(r);
 
                 return (
                   <React.Fragment key={r.username}>
@@ -517,8 +516,7 @@ export default function UserManagementPage() {
                       <td className="px-4 py-2">
                         {/* Username is immutable (disabled) */}
                         <input
-                          className={["w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-150 text-slate-500",
-                            disabledRow ? "cursor-not-allowed" : "cursor-default"
+                          className={["w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-150 text-slate-500 cursor-not-allowed",
                           ].join(" ")}
                           value={r.username}
                           onChange={() => {}}
@@ -581,8 +579,10 @@ export default function UserManagementPage() {
 
                       <td className="px-4 py-2">
                         <button
-                          className="rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full"
-                          disabled={r.saving}
+                          className={["rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full",
+                            canSave ? "hover:bg-blue-700" : "cursor-not-allowed bg-slate-400"
+                          ].join(" ")}
+                          disabled={!canSave}
                           onClick={() => saveRow(r)}
                         >
                           {r.saving
