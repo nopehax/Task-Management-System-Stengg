@@ -538,14 +538,14 @@ export default function UserManagementPage() {
                         <input
                           type="email"
                           className={["w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-                            , disabledRow ? "cursor-not-allowed" : "cursor-pointer"
+                            // , disabledRow ? "cursor-not-allowed" : "cursor-pointer"
                           ].join(" ")}
                           value={r.email}
                           onChange={(e) =>
-                            !disabledRow &&
+                            // !disabledRow &&
                             setField(r.username, "email", e.target.value)
                           }
-                          disabled={disabledRow}
+                          // disabled={disabledRow}
                         />
                       </td>
 
@@ -553,15 +553,15 @@ export default function UserManagementPage() {
                         <input
                           type="password"
                           placeholder="(leave blank to keep)"
-                          className={["w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500",
-                            disabledRow ? "cursor-not-allowed" : "cursor-pointer"
+                          className={["w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                            // , disabledRow ? "cursor-not-allowed" : "cursor-pointer"
                           ].join(" ")}
                           value={r.password}
                           onChange={(e) =>
-                            !disabledRow &&
+                            // !disabledRow &&
                             setField(r.username, "password", e.target.value)
                           }
-                          disabled={disabledRow}
+                          // disabled={disabledRow}
                         />
                       </td>
 
