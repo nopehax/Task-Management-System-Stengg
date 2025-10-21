@@ -24,26 +24,53 @@ router.get('/usergroups', authRequired, async (_req, res) => {
 
 // add new userGroup to catalog
 router.post('/usergroups', authRequired, requireGroup(['admin']), async (req, res) => {
-  try {
-    const raw = req.body?.groupName;
-    if (!raw || typeof raw !== "string") return res.status(400).json({ error: "groupName is required" });
-    const groupName = normalizeGroup(raw);
-    if (!groupName) return res.status(400).json({ error: "Invalid group name" });
-    if (groupName.length > 50) return res.status(400).json({ error: "group name too long" });
+  const raw = req.body?.groupName;
+  if (!raw || typeof raw !== "string") {
+    return res.status(400).json({ error: "groupName is required" });
+  }
 
+  const groupName = normalizeGroup(raw);
+  if (!groupName) return res.status(400).json({ error: "Invalid group name" });
+  if (groupName.length > 50) return res.status(400).json({ error: "group name too long" });
+
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const conn = await pool.getConnection();
     try {
-      await pool.execute("INSERT INTO userGroups (name) VALUES (?)", [groupName]);
-      return res.status(201).json({ groupName });
-    } catch (err) {
-      if (err && err.code === "ER_DUP_ENTRY") {
-        return res.status(200).json({ groupName });
+      await conn.beginTransaction();
+
+      try {
+        await conn.execute("INSERT INTO userGroups (name) VALUES (?)", [groupName]);
+        await conn.commit();
+        conn.release();
+        return res.status(201).json({ groupName });
+      } catch (err) {
+        if (err && err.code === "ER_DUP_ENTRY") {
+          await conn.rollback();
+          conn.release();
+          return res.status(200).json({ groupName });
+        }
+        throw err; // let outer catch handle retry/500
       }
-      throw err;
+
+    } catch (err) {
+      try { await conn.rollback(); } catch {}
+      conn.release();
+      
+      if (
+        err &&
+        (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") &&
+        attempt < maxRetries
+      ) {
+        await new Promise(r => setTimeout(r, 50 * attempt));
+        continue;
+      }
+
+      console.error("Add userGroup error:", err);
+      return res.status(500).json({ error: "Failed to add user group." });
     }
-  } catch (err) {
-    console.error("Add userGroup error:", err);
-    return res.status(500).json({ error: "Failed to add user group." });
   }
 });
+
 
 module.exports = router;

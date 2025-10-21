@@ -36,166 +36,300 @@ router.get('/users', authRequired, requireGroup(['admin']), async (_req, res) =>
 
 // Admin: create new user
 router.post('/users', authRequired, requireGroup(['admin']), async (req, res) => {
-  try {
-    const { username, email, password, userGroups, active = 1 } = req.body || {};
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: "username, email, and password are required" });
-    }
-    if (!isValidPass(password)) {
-      return res.status(400).json({ error: "Password does not meet requirements." });
-    }
+  const { username, email, password, userGroups, active = 1 } = req.body || {};
 
-    let groups = Array.isArray(userGroups) ? userGroups : [];
+  if (!username || !email || !password) {
+    return res.status(400).json({ error: "username, email, and password are required" });
+  }
+  if (!isValidPass(password)) {
+    return res.status(400).json({ error: "Password does not meet requirements." });
+  }
 
-    // validate against catalog
-    if (groups.length > 0) {
-      const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-      const catalog = new Set(catalogRows.map((r) => r.name));
-      const invalid = groups.filter((g) => !catalog.has(g));
-      if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+  // Validate groups against catalog
+  const groups = Array.isArray(userGroups) ? userGroups : [];
+  if (groups.length > 0) {
+    const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
+    const catalog = new Set(catalogRows.map(r => r.name));
+    const invalid = groups.filter(g => !catalog.has(g));
+    if (invalid.length) {
+      return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
     }
+  }
 
-    const hash = await getHash(String(password));
-    await pool.execute(
-      "INSERT INTO accounts (username, password, email, userGroups, active) VALUES (?,?,?,?,?)",
-      [username, hash, email, JSON.stringify(groups), active ? 1 : 0]
-    );
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    return res.status(201).json({ username, email, userGroups: groups, active: !!active });
-  } catch (err) {
-    if (err && err.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ error: "Username or email already exists" });
+      // Insert user
+      const hash = await getHash(String(password));
+      await conn.execute(
+        "INSERT INTO accounts (username, password, email, userGroups, active) VALUES (?,?,?,?,?)",
+        [username, hash, email, JSON.stringify(groups), active ? 1 : 0]
+      );
+
+      await conn.commit();
+      conn.release();
+      return res.status(201).json({ username, email, userGroups: groups, active: !!active });
+
+    } catch (err) {
+      // Roll back + release before handling
+      try { await conn.rollback(); } catch {}
+      conn.release();
+
+      if (err && err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({ error: "Username or email already exists" });
+      }
+
+      // Retry on deadlock/timeout
+      if (err && (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") && attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 50 * attempt));
+        continue;
+      }
+
+      console.error("Create user error:", err);
+      return res.status(500).json({ error: "Server error" });
     }
-    console.error("Create user error:", err);
-    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // Admin: update user by :username (email/password/active/userGroups)
 router.patch('/users/:username', authRequired, requireGroup(['admin']), async (req, res) => {
-  try {
-    const username = normalizeStr(req.params.username);
-    if (!username) return res.status(400).json({ error: "Invalid username" });
-    const incoming = req.body || {};
+  const username = normalizeStr(req.params.username);
+  if (!username) return res.status(400).json({ error: "Invalid username" });
 
-    const sets = [];
-    const values = [];
+  const incoming = req.body || {};
+  const updates = [];
+  const values  = [];
 
-    if (incoming.email !== undefined) {
-      if (!isValidEmail(incoming.email)) return res.status(400).json({ error: "Invalid email format." });
-      sets.push("`email` = ?"); values.push(incoming.email);
+  if (incoming.email !== undefined) {
+    if (!isValidEmail(incoming.email)) {
+      return res.status(400).json({ error: "Invalid email format." });
     }
-    if (incoming.active !== undefined) {
-      if (username === "admin" && !incoming.active) {
-        return res.status(400).json({ error: "Cannot deactivate the admin user" });
+    updates.push("`email` = ?"); values.push(incoming.email);
+  }
+
+  if (incoming.active !== undefined) {
+    if (username === "admin" && !incoming.active) {
+      return res.status(400).json({ error: "Cannot deactivate the admin user" });
+    }
+    updates.push("`active` = ?"); values.push(incoming.active ? 1 : 0);
+  }
+
+  let groupsPayload;
+  if (incoming.userGroups !== undefined) {
+    let groups = Array.isArray(incoming.userGroups) ? incoming.userGroups : [];
+    groups = groups.filter(Boolean);
+    if (username === "admin" && !groups.includes("admin")) {
+      return res.status(400).json({ error: "Cannot remove admin rights from this user" });
+    }
+    if (groups.length > 0) {
+    const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
+    const catalog = new Set(catalogRows.map(r => r.name));
+    const invalid = groups.filter(g => !catalog.has(g));
+    if (invalid.length) {
+      return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+    }
+  }
+    groupsPayload = groups;
+    updates.push("`userGroups` = ?"); values.push(JSON.stringify(groupsPayload));
+  }
+
+  let passwordHashToSet = null;
+  if (incoming.password !== undefined) {
+    const raw = String(incoming.password ?? "");
+    if (!isValidPass(raw)) {
+      return res.status(400).json({ error: "Password does not meet requirements." });
+    }
+    // hash outside tx is fine; keeps tx short
+    passwordHashToSet = await getHash(raw);
+    updates.push("`password` = ?");
+    values.push(passwordHashToSet);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No updatable fields provided" });
+  }
+
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Perform the update
+      const sql = `UPDATE accounts SET ${updates.join(", ")} WHERE username = ? LIMIT 1`;
+      const params = [...values, username];
+      const [result] = await conn.execute(sql, params);
+
+      if (result.affectedRows === 0) {
+        await conn.rollback();
+        conn.release();
+        return res.status(404).json({ error: "User not found" });
       }
-      sets.push("`active` = ?"); values.push(incoming.active ? 1 : 0);
-    }
-    if (incoming.userGroups !== undefined) {
-      let groups = Array.isArray(incoming.userGroups) ? incoming.userGroups : [];
-      groups = groups.filter(Boolean);
-      if (username === "admin" && !groups.includes("admin")) {
-        return res.status(400).json({ error: "Cannot remove admin rights from this user" });
+
+      // Fetch canonical row to return
+      const [rows] = await conn.execute(
+        "SELECT username, email, active, userGroups FROM accounts WHERE username = ? LIMIT 1",
+        [username]
+      );
+      if (!rows || rows.length === 0) {
+        await conn.rollback();
+        conn.release();
+        return res.status(404).json({ error: "User not found" });
+      }
+      const row = rows[0];
+      let groups;
+      groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]");
+
+      await conn.commit();
+      conn.release();
+      return res.json({
+        username: row.username,
+        email: row.email,
+        active: !!row.active,
+        userGroups: groups
+      });
+
+    } catch (err) {
+      try { await conn.rollback(); } catch {}
+      conn.release();
+
+      if (err && err.code === "ER_DUP_ENTRY") {
+        return res.status(409).json({ error: "Email already exists" });
       }
 
-      if (groups.length > 0) {
-        const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-        const catalog = new Set(catalogRows.map((r) => r.name));
-        const invalid = groups.filter((g) => !catalog.has(g));
-        if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+      if (err && (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") && attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, 50 * attempt));
+        continue; // retry the transaction
       }
 
-      sets.push("`userGroups` = ?"); values.push(JSON.stringify(groups));
+      console.error("Patch user error:", err);
+      return res.status(500).json({ error: "Server error" });
     }
-    if (incoming.password !== undefined) {
-      const raw = String(incoming.password ?? "");
-      if (!isValidPass(raw)) return res.status(400).json({ error: "Password does not meet requirements." });
-      const hash = await getHash(raw);
-      sets.push("`password` = ?"); values.push(hash);
-    }
-
-    if (sets.length === 0) return res.status(400).json({ error: "No updatable fields provided" });
-    values.push(username);
-
-    const sql = `UPDATE accounts SET ${sets.join(", ")} WHERE username = ? LIMIT 1`;
-    const [result] = await pool.execute(sql, values);
-    if (result.affectedRows === 0) return res.status(404).json({ error: "User not found" });
-
-    const [rows] = await pool.execute(
-      "SELECT username, email, active, userGroups FROM accounts WHERE username = ? LIMIT 1",
-      [username]
-    );
-    const row = rows[0];
-    let groups = [];
-    groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]");
-    return res.json({ username: row.username, email: row.email, active: !!row.active, userGroups: groups });
-  } catch (err) {
-    if (err && err.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({ error: "Email already exists" });
-    }
-    console.error("Patch user error:", err);
-    return res.status(500).json({ error: "Server error" });
   }
 });
 
 // Self profile: update own email/password only
-router.patch('/user/:username',
-  authRequired, async (req, res) => {
+router.patch('/user/:username', authRequired, async (req, res) => {
+  const username = req.params.username;
+  if (!username) return res.status(400).json({ error: "Invalid username" });
+  if (req.auth.username !== username) {
+    return res.status(403).json({ error: "Not authorized to update this profile" });
+  }
+
+  const incoming = req.body || {};
+  const updates = [];
+  const values  = [];
+
+  // validation checks first)
+  if (incoming.email !== undefined) {
+    if (!isValidEmail(incoming.email)) {
+      return res.status(400).json({ error: "Invalid email format." });
+    }
+    updates.push("`email` = ?"); values.push(incoming.email);
+  }
+
+  let newPasswordHash = null;
+  let newPasswordRaw  = null;
+  if (incoming.password !== undefined) {
+    const raw = String(incoming.password ?? "");
+    if (!isValidPass(raw)) {
+      return res.status(400).json({ error: "Password does not meet requirements." });
+    }
+    const cur = String(incoming.currentPassword ?? "");
+    if (!cur) {
+      return res.status(400).json({ error: "Current password is required to set a new password." });
+    }
+    newPasswordRaw  = raw;
+    newPasswordHash = await getHash(raw);
+    updates.push("`password` = ?");
+    values.push(newPasswordHash);
+  }
+
+  if (updates.length === 0) {
+    return res.status(400).json({ error: "No updatable fields provided" });
+  }
+
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const conn = await pool.getConnection();
     try {
-      const username = req.params.username;
-      if (!username) return res.status(400).json({ error: "Invalid username" });
-      if (req.auth.username !== username) {
-        return res.status(403).json({ error: "Not authorized to update this profile" });
-      }
+      await conn.beginTransaction();
 
-      const incoming = req.body || {};
-      const sets = [];
-      const values = [];
-
-      if (incoming.email !== undefined) {
-        if (!isValidEmail(incoming.email)) return res.status(400).json({ error: "Invalid email format." });
-        sets.push("`email` = ?"); values.push(incoming.email);
-      }
-
-      if (incoming.password !== undefined) {
-        const raw = String(incoming.password ?? "");
-        if (!isValidPass(raw)) return res.status(400).json({ error: "Password does not meet requirements." });
-        const cur = String(incoming.currentPassword ?? "");
-        if (!cur) return res.status(400).json({ error: "Current password is required to set a new password." });
-
-        const [rows] = await pool.execute("SELECT password FROM accounts WHERE username = ? LIMIT 1", [username]);
-        if (!rows || rows.length === 0) return res.status(404).json({ error: "User not found" });
+      // If password change requested, verify current password against a locked row
+      if (newPasswordHash !== null) {
+        const [rows] = await conn.execute(
+          "SELECT password FROM accounts WHERE username = ? LIMIT 1",
+          [username]
+        );
+        if (!rows || rows.length === 0) {
+          await conn.rollback(); conn.release();
+          return res.status(404).json({ error: "User not found" });
+        }
         const currentHash = rows[0].password;
-        if (!(await compareHash(cur, currentHash))) {
+        const cur = String(incoming.currentPassword ?? "");
+        const ok = await compareHash(cur, currentHash);
+        if (!ok) {
+          await conn.rollback(); conn.release();
           return res.status(400).json({ error: "Current password is incorrect." });
         }
-        const hash = await getHash(raw);
-        sets.push("`password` = ?"); values.push(hash);
       }
 
-      if (sets.length === 0) return res.status(400).json({ error: "No updatable fields provided" });
+      // Apply updates
+      const sql = `UPDATE accounts SET ${updates.join(", ")} WHERE username = ? LIMIT 1`;
+      const params = [...values, username];
+      const [result] = await conn.execute(sql, params);
+      if (result.affectedRows === 0) {
+        await conn.rollback(); conn.release();
+        return res.status(404).json({ error: "User not found" });
+      }
 
-      values.push(username);
-      const sql = `UPDATE accounts SET ${sets.join(", ")} WHERE username = ? LIMIT 1`;
-      const [result] = await pool.execute(sql, values);
-      if (result.affectedRows === 0) return res.status(404).json({ error: "User not found" });
-
-      const [userRows] = await pool.execute(
+      // Read back canonical row
+      const [userRows] = await conn.execute(
         "SELECT username, email, active, userGroups FROM accounts WHERE username = ? LIMIT 1",
         [username]
       );
+      if (!userRows || userRows.length === 0) {
+        await conn.rollback(); conn.release();
+        return res.status(404).json({ error: "User not found" });
+      }
+
       const row = userRows[0];
-      let groups = [];
+      let groups;
       groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]");
-      return res.json({ username: row.username, email: row.email, active: !!row.active, userGroups: groups });
+
+      await conn.commit();
+      conn.release();
+
+      return res.json({
+        username: row.username,
+        email: row.email,
+        active: !!row.active,
+        userGroups: groups,
+      });
+
     } catch (err) {
+      try { await conn.rollback(); } catch {}
+      conn.release();
+
       if (err && err.code === "ER_DUP_ENTRY") {
         return res.status(409).json({ error: "Email already exists" });
       }
+      if (
+        err &&
+        (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") &&
+        attempt < maxRetries
+      ) {
+        await new Promise(r => setTimeout(r, 50 * attempt));
+        continue; // retry transaction
+      }
+
       console.error("Patch self user error:", err);
       return res.status(500).json({ error: "Server error" });
     }
   }
-);
+});
 
 module.exports = router;
