@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 const LoginPage = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState([]);   // array of strings
+  const [errors, setErrors] = useState([]);
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();

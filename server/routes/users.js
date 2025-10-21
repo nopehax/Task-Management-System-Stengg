@@ -20,7 +20,7 @@ const compareHash = async (password, hash) => bcrypt.compare(password, hash);
 router.get('/users', authRequired, requireGroup(['admin']), async (_req, res) => {
   try {
     const [rows] = await pool.execute(
-      "SELECT username, email, active, userGroups FROM accounts ORDER BY username ASC"
+      "SELECT username, email, active, userGroups FROM accounts"
     );
     const out = rows.map((r) => {
       let groups = [];
@@ -29,7 +29,7 @@ router.get('/users', authRequired, requireGroup(['admin']), async (_req, res) =>
     });
     return res.json(out);
   } catch (err) {
-    console.error("Get users error:", err);
+    console.error("Get userList error:", err);
     return res.status(500).json({ error: "Failed to fetch users." });
   }
 });
@@ -46,13 +46,12 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
     }
 
     // default groups = ["dev_team"] if not provided
-    let groups = Array.isArray(userGroups) ? userGroups : ["dev_team"];
-    groups = groups.filter(Boolean);
+    let groups = Array.isArray(userGroups) ? userGroups : [];
     if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
     // validate against catalog
     const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-    const catalog = new Set(catalogRows.map((r) => r.name));
+    const catalog = catalogRows.map((r) => r.name)
     const invalid = groups.filter((g) => !catalog.has(g));
     if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
 
@@ -101,7 +100,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
       if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
       const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-      const catalog = new Set(catalogRows.map((r) => r.name));
+      const catalog = catalogRows.map((r) => r.name)
       const invalid = groups.filter((g) => !catalog.has(g));
       if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
 
@@ -127,7 +126,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
     );
     const row = rows[0];
     let groups = [];
-    try { groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]"); } catch {}
+    groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]");
     return res.json({ username: row.username, email: row.email, active: !!row.active, userGroups: groups });
   } catch (err) {
     if (err && err.code === "ER_DUP_ENTRY") {
@@ -180,13 +179,13 @@ router.patch('/user/:username',
       const [result] = await pool.execute(sql, values);
       if (result.affectedRows === 0) return res.status(404).json({ error: "User not found" });
 
-      const [rows2] = await pool.execute(
+      const [userRows] = await pool.execute(
         "SELECT username, email, active, userGroups FROM accounts WHERE username = ? LIMIT 1",
         [username]
       );
-      const row = rows2[0];
+      const row = userRows[0];
       let groups = [];
-      try { groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]"); } catch {}
+      groups = Array.isArray(row.userGroups) ? row.userGroups : JSON.parse(row.userGroups || "[]");
       return res.json({ username: row.username, email: row.email, active: !!row.active, userGroups: groups });
     } catch (err) {
       if (err && err.code === "ER_DUP_ENTRY") {

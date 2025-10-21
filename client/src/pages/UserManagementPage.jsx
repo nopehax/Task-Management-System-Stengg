@@ -171,10 +171,6 @@ export default function UserManagementPage() {
   };
 
   const saveRow = async (row) => {
-    const isAdminRow = row.username === "admin";
-    const isSuperAdmin = (currentUser?.username || "") === "admin";
-    const disabledRow = isAdminRow && !isSuperAdmin;
-
     const err = validateRow(row, false);
     setRows((prev) =>
       prev.map((r) => (r.username === row.username ? { ...r, rowErr: err } : r))
@@ -333,7 +329,6 @@ export default function UserManagementPage() {
     }
   };
 
-  // inline add-group (input + button)
   const addNewGroup = async () => {
     setGroupErr("");
     const normalized = normalizeStr(newGroupName);
