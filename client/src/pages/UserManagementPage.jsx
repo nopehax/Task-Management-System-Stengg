@@ -43,7 +43,7 @@ export default function UserManagementPage() {
   const [newUser, setNewUser] = useState({
     username: "",
     email: "",
-    userGroups: ["dev team"],
+    userGroups: [],
     password: "",
     active: true,
   });
@@ -56,7 +56,7 @@ export default function UserManagementPage() {
       newUser.email &&
       newUser.password &&
       Array.isArray(newUser.userGroups) &&
-      newUser.userGroups.length > 0 &&
+      newUser.userGroups.length >= 0 &&
       !creating
     );
   }, [newUser, creating]);
@@ -153,12 +153,13 @@ export default function UserManagementPage() {
     const selected = Array.isArray(r.userGroups)
       ? r.userGroups.map(normalizeStr)
       : [];
-    if (selected.length === 0) return "At least one group is required.";
 
     // Must all exist in catalog
-    const catalog = new Set(groups);
-    const invalid = selected.filter((g) => !catalog.has(g));
-    if (invalid.length) return "Unknown groups: " + invalid.join(", ");
+    if (selected.length > 0) {
+      const catalog = new Set(groups);
+      const invalid = selected.filter((g) => !catalog.has(g));
+      if (invalid.length) return "Unknown groups: " + invalid.join(", ");
+    }
 
     // Password policy 8–10 (only required for create)
     if (isNew) {
@@ -306,7 +307,7 @@ export default function UserManagementPage() {
       setNewUser({
         username: "",
         email: "",
-        userGroups: ["dev team"],
+        userGroups: [],
         password: "",
         active: true,
       });

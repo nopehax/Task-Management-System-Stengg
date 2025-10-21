@@ -45,15 +45,15 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
       return res.status(400).json({ error: "Password does not meet requirements." });
     }
 
-    // default groups = ["dev_team"] if not provided
     let groups = Array.isArray(userGroups) ? userGroups : [];
-    if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
     // validate against catalog
-    const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-    const catalog = catalogRows.map((r) => r.name)
-    const invalid = groups.filter((g) => !catalog.has(g));
-    if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+    if (groups.length > 0) {
+      const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
+      const catalog = new Set(catalogRows.map((r) => r.name));
+      const invalid = groups.filter((g) => !catalog.has(g));
+      if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+    }
 
     const hash = await getHash(String(password));
     await pool.execute(
@@ -97,12 +97,13 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
       if (username === "admin" && !groups.includes("admin")) {
         return res.status(400).json({ error: "Cannot remove admin rights from this user" });
       }
-      if (groups.length === 0) return res.status(400).json({ error: "At least one group is required" });
 
-      const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-      const catalog = catalogRows.map((r) => r.name)
-      const invalid = groups.filter((g) => !catalog.has(g));
-      if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+      if (groups.length > 0) {
+        const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
+        const catalog = new Set(catalogRows.map((r) => r.name));
+        const invalid = groups.filter((g) => !catalog.has(g));
+        if (invalid.length) return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+      }
 
       sets.push("`userGroups` = ?"); values.push(JSON.stringify(groups));
     }
