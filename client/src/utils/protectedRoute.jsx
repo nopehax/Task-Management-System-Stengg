@@ -19,17 +19,7 @@ const ProtectedRoute = ({ allow }) => {
 
   // OR semantics: pass if user has ANY of the allowed groups
   const allowed = Array.isArray(allow) ? allow : [allow];
-
-  // prefer context helper if available
-  const ok =
-    typeof hasAnyGroup === "function"
-      ? hasAnyGroup(...allowed)
-      : (() => {
-          const mine = Array.isArray(user.userGroups)
-            ? user.userGroups
-            : [];
-          return allowed.some((g) => mine.includes(g));
-        })();
+  const ok = hasAnyGroup(...allowed);
 
   if (!ok) {
     return <Navigate to="/403" replace state={{ from: location }} />;
