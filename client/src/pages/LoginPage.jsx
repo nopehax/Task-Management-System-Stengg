@@ -53,7 +53,7 @@ const LoginPage = () => {
 
   return (
     <div className="flex flex-col flex-auto justify-center items-center min-h-0 overflow-auto">
-      <form className="flex flex-col flex-initial" onSubmit={handleSubmit} noValidate>
+      <form className="flex flex-col flex-initial" onSubmit={handleSubmit} noValidate autoComplete="off">
         <h1 className="text-2xl font-medium mb-4">Sign in</h1>
         <div style={{ display: "flex", flexDirection: "column" }}>
           <label htmlFor="username">Username</label>
@@ -61,7 +61,7 @@ const LoginPage = () => {
             id="username"
             className="border-2 border-black rounded-md text-sm"
             type="text"
-            autoComplete="username"
+            autoComplete="new-password"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             disabled={loading}
@@ -75,7 +75,7 @@ const LoginPage = () => {
             id="password"
             className="border-2 border-black rounded-md text-sm"
             type="password"
-            autoComplete="current-password"
+            autoComplete="off"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             disabled={loading}
