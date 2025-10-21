@@ -11,8 +11,10 @@ const api = axios.create({
 });
 
 export default function UserProfilePage() {
-  const { user, ready } = useAuth(); // expects { id, username, email, userGroup }
-  const { id: paramId } = useParams();
+  // expects user shape: { username, email, userGroups: string[], active }
+  const { user, ready } = useAuth();
+  const { username: routeUsername } = useParams();
+
   const [form, setForm] = useState({
     email: "",
     currentPassword: "",
@@ -23,19 +25,16 @@ export default function UserProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  
-  const routeId = Number(paramId);
 
   // Hydrate form from context user
   useEffect(() => {
-    if (!ready) return;
-    if (!user) return;
-    if (!Number.isInteger(routeId) || routeId !== Number(user.id)) return;
+    if (!ready || !user) return;
+    if (routeUsername !== user.username) return;
 
     const email = user.email || "";
     setForm((f) => ({ ...f, email }));
     setOrig({ email });
-  }, [ready, user, routeId]);
+  }, [ready, user, routeUsername]);
 
   const onChange = (k) => (e) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -53,7 +52,7 @@ export default function UserProfilePage() {
     if (wantsPwd) {
       if (!form.currentPassword) return "Current password is required.";
       if (form.password.length < 8 || form.password.length > 10)
-        return "New password must be 8-10 characters.";
+        return "New password must be 8–10 characters.";
       if (form.password !== form.confirmPassword)
         return "Passwords do not match.";
     }
@@ -88,7 +87,7 @@ export default function UserProfilePage() {
 
     setSaving(true);
     try {
-      const { data } = await api.patch(`/user/${user.id}`, payload);
+      const { data } = await api.patch(`/user/${user.username}`, payload);
       const newEmail = data?.email ?? payload.email ?? form.email;
 
       // Reset form & snapshot; clear password fields
@@ -113,9 +112,13 @@ export default function UserProfilePage() {
   };
 
   if (!ready) return <div className="p-6">Loading…</div>;
-  if (!user || !Number.isInteger(routeId) || routeId !== Number(user.id)) {
+  if (!user || routeUsername !== user.username) {
     return <Navigate to="/403" replace />;
   }
+
+  const groups = Array.isArray(user.userGroups)
+    ? user.userGroups
+    : [];
 
   return (
     <div className="p-6">
@@ -124,9 +127,9 @@ export default function UserProfilePage() {
 
       <div className="max-w-md mx-auto rounded-xl border border-slate-200 p-6">
         <form onSubmit={onSubmit} className="space-y-4">
-          {/* Read-only fields to match the mock */}
+          {/* Read-only identity */}
           <div>
-            <label className="block text-sm text-slate-600 mb-1">Name</label>
+            <label className="block text-sm text-slate-600 mb-1">Username</label>
             <input
               className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
               value={user.username || ""}
@@ -135,10 +138,10 @@ export default function UserProfilePage() {
           </div>
 
           <div>
-            <label className="block text-sm text-slate-600 mb-1">User Group</label>
+            <label className="block text-sm text-slate-600 mb-1">Groups</label>
             <input
               className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
-              value={user.userGroup || ""}
+              value={groups.join(", ")}
               disabled
             />
           </div>

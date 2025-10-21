@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import axios from "axios";
 
 const AuthContext = createContext(null);
@@ -11,6 +11,7 @@ const API_LOGOUT = "http://localhost:3000/api/logout";
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // user shape: { username, email, userGroups: string[], active: boolean }
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(false);
 
@@ -20,16 +21,21 @@ export const AuthProvider = ({ children }) => {
     (async () => {
       try {
         const res = await axios.get(API_ME);
+        const me = res?.data?.user ?? null;
+
         if (!cancelled) {
-          setIsAuthenticated(true);
-          setUser(res.data?.user ?? null);
-          if (res.data?.user) localStorage.setItem("authUser", JSON.stringify(res.data.user));
+          if (me && me.username && Array.isArray(me.userGroups) && me.active) {
+            setIsAuthenticated(true);
+            setUser(me);
+          } else {
+            setIsAuthenticated(false);
+            setUser(null);
+          }
         }
       } catch {
         if (!cancelled) {
           setIsAuthenticated(false);
           setUser(null);
-          localStorage.removeItem("authUser");
         }
       } finally {
         if (!cancelled) setReady(true);
@@ -38,7 +44,7 @@ export const AuthProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, []);
 
-  // Login: sets HttpOnly cookie on success; we also store the returned user locally
+  // Login: sets HttpOnly cookie on success; store returned user locally
   const login = async (username, password) => {
     try {
       const res = await axios.post(
@@ -46,10 +52,16 @@ export const AuthProvider = ({ children }) => {
         { username, password },
         { headers: { "Content-Type": "application/json" } }
       );
-      setIsAuthenticated(true);
-      setUser(res.data?.user ?? null);
-      if (res.data?.user) localStorage.setItem("authUser", JSON.stringify(res.data.user));
-      return res.data;
+      const me = res?.data?.user ?? null;
+
+      if (me && me.username && Array.isArray(me.userGroups) && me.active) {
+        setIsAuthenticated(true);
+        setUser(me);
+      } else {
+        // Defensive: treat missing/invalid shape as failure
+        throw new Error("Login failed. Please check your credentials.");
+      }
+      return me;
     } catch (err) {
       const msg = err?.response?.data?.error || "Login failed. Please check your credentials.";
       throw new Error(msg);
@@ -65,13 +77,21 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setIsAuthenticated(false);
       setUser(null);
-      localStorage.removeItem("authUser");
     }
   };
 
+  // Helper: OR semantics—true if user has ANY allowed group
+  const hasAnyGroup = useCallback((...allowed) => {
+    if (!user || !Array.isArray(user.userGroups)) return false;
+    if (!allowed || allowed.length === 0) return false;
+    const mine = user.userGroups
+    return allowed.some((g) => mine.includes(g));
+  }, [user]);
+
+
   const value = useMemo(
-    () => ({ isAuthenticated, ready, user, login, logout }),
-    [isAuthenticated, ready, user]
+    () => ({ isAuthenticated, ready, user, login, logout, hasAnyGroup }),
+    [isAuthenticated, ready, user, hasAnyGroup]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
