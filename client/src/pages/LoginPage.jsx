@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../utils/authContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const LoginPage = () => {
   const [username, setUsername] = useState("");
@@ -9,6 +9,7 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isOnlyAdmin = (u) =>
     !!u &&
@@ -21,10 +22,11 @@ const LoginPage = () => {
       if (isOnlyAdmin(user)) {
         navigate("/usermanage", { replace: true });
       } else {
-        navigate("/applications", { replace: true });
+        const from = location.state?.from || "/applications";
+        navigate(from, { replace: true });
       }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
