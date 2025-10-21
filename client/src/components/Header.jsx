@@ -28,6 +28,11 @@ export default function HeaderPage() {
     };
   }, [open]);
 
+  const handleHome = () => {
+    setOpen(false);
+    navigate("/");
+  }
+
   const handleLogout = async () => {
     setOpen(false);
     await logout();
@@ -36,17 +41,20 @@ export default function HeaderPage() {
 
   const handleProfile = () => {
     setOpen(false);
-    const id = user?.id;
-    navigate(id ? `/user/${id}` : "/user/me");
+    const username = user?.username;
+    navigate(username ? `/user/${username}` : "/user/me");
   };
+
+  const handleUserManagement = () => {
+    setOpen(false);
+    navigate("/usermanage");
+  }
 
   return (
     <header className="w-full border-b-4 border-black">
-      {/* Flex container keeps title and avatar vertically centered */}
       <div className="mx-auto flex items-center justify-between px-6 py-3">
         <h2 className="text-2xl font-medium">Task Management System</h2>
 
-        {/* Avatar + menu anchor */}
         <div className="relative">
           <button
             ref={btnRef}
@@ -77,8 +85,26 @@ export default function HeaderPage() {
               ref={menuRef}
               role="menu"
               aria-orientation="vertical"
-              className="absolute right-0 mt-3 w-56 rounded-lg shadow-md bg-purple-200 p-2"
+              className="absolute z-[999] right-0 mt-3 w-56 rounded-lg bg-purple-200 p-2"
             >
+              <button
+                type="button"
+                onClick={handleHome}
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                role="menuitem"
+              >
+                Home
+              </button>
+              {user?.userGroups?.includes("admin") && (
+                <button
+                  type="button"
+                  onClick={handleUserManagement}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  role="menuitem"
+                >
+                  User Management
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleProfile}
