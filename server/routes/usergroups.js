@@ -8,7 +8,7 @@ const { authRequired, requireGroup } = require('../middleware/auth');
 /** lowercase, max 50 char */
 function normalizeGroup(name) {
   if (typeof name !== "string") return "";
-  return name.trim().toLowerCase().slice(0, 50);
+  return name.trim().toLowerCase();
 }
 
 // get userGroups catalog
@@ -31,7 +31,7 @@ router.post('/usergroups', authRequired, requireGroup(['admin']), async (req, re
 
   const groupName = normalizeGroup(raw);
   if (!groupName) return res.status(400).json({ error: "Invalid group name" });
-  if (groupName.length > 50) return res.status(400).json({ error: "group name too long" });
+  if (groupName.length > 50) return res.status(400).json({ error: "Group name should be <50 char." });
 
   const maxRetries = 3;
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -56,7 +56,7 @@ router.post('/usergroups', authRequired, requireGroup(['admin']), async (req, re
     } catch (err) {
       try { await conn.rollback(); } catch {}
       conn.release();
-      
+
       if (
         err &&
         (err.code === "ER_LOCK_DEADLOCK" || err.code === "ER_LOCK_WAIT_TIMEOUT") &&
