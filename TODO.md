@@ -1,9 +1,9 @@
 # TODO
 
-- when logging out then log back in, the user will be redirected to where the prev user logged out from
 
 ## Changes made
 
+- when logging out then log back in, the user will be redirected to where the prev user logged out from
 - empty input when login also invalid message
 - change login look
 - password invalid error message need say use special char etc...
