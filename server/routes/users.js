@@ -5,11 +5,10 @@ const router = express.Router();
 const { pool } = require('../config/db');
 const { authRequired, requireGroup } = require('../middleware/auth');
 
-const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email || "");
+const isValidEmail = (email) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email || "");
 const isValidPass = (password) => {
   const pw = String(password ?? "");
-  if (pw.length < 8 || pw.length > 10) return false;
-  return /^[A-Za-z0-9!@#$%^&*()_+\-=\[\]{};':",.<>\/?]+$/.test(pw);
+  return /^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(pw);
 };
 
 const normalizeStr = (name) => name.trim().toLowerCase();
@@ -39,10 +38,16 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
   const { username, email, password, userGroups, active = 1 } = req.body || {};
 
   if (!username || !email || !password) {
-    return res.status(400).json({ error: "username, email, and password are required" });
+    return res.status(400).json({ error: "Field(s) cannot be empty." });
+  }
+  if (username.length > 50) {
+    return res.status(400).json({ error: "Username must not be longer than 50 characters." });
+  }
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ error: "Email must be valid." });
   }
   if (!isValidPass(password)) {
-    return res.status(400).json({ error: "Password does not meet requirements." });
+    return res.status(400).json({ error: "Password must be 8–10 characters long and include at least one letter, one number, and one special character." });
   }
 
   // Validate groups against catalog
@@ -112,7 +117,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
 
   if (incoming.active !== undefined) {
     if (username === "admin" && !incoming.active) {
-      return res.status(400).json({ error: "Cannot deactivate the admin user" });
+      return res.status(400).json({ error: "Cannot deactivate the original admin." });
     }
     updates.push("`active` = ?"); values.push(incoming.active ? 1 : 0);
   }
@@ -122,7 +127,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
     let groups = Array.isArray(incoming.userGroups) ? incoming.userGroups : [];
     groups = groups.filter(Boolean);
     if (username === "admin" && !groups.includes("admin")) {
-      return res.status(400).json({ error: "Cannot remove admin rights from this user" });
+      return res.status(400).json({ error: "Cannot remove admin group from original admin." });
     }
     if (groups.length > 0) {
     const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
@@ -140,7 +145,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
   if (incoming.password !== undefined) {
     const raw = String(incoming.password ?? "");
     if (!isValidPass(raw)) {
-      return res.status(400).json({ error: "Password does not meet requirements." });
+      return res.status(400).json({ error: "Password must be 8–10 characters long and include at least one letter, one number, and one special character." });
     }
     // hash outside tx is fine; keeps tx short
     passwordHashToSet = await getHash(raw);
@@ -236,7 +241,7 @@ router.patch('/user/:username', authRequired, async (req, res) => {
   if (incoming.password !== undefined) {
     const raw = String(incoming.password ?? "");
     if (!isValidPass(raw)) {
-      return res.status(400).json({ error: "Password does not meet requirements." });
+      return res.status(400).json({ error: "Password must be 8–10 characters long and include at least one letter, one number, and one special character." });
     }
     const cur = String(incoming.currentPassword ?? "");
     if (!cur) {

@@ -147,8 +147,9 @@ export default function UserManagementPage() {
 
   const validateRow = (r, isNew = false) => {
     if (!r.username?.trim()) return "Username is required.";
+    if (r.username.length > 50) return "Username must not be longer than 50 characters.";
     if (!r.email?.trim()) return "Email is required.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email)) return "Email looks invalid.";
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(r.email)) return "Email must be valid.";
 
     const selected = Array.isArray(r.userGroups)
       ? r.userGroups.map(normalizeStr)
@@ -161,14 +162,15 @@ export default function UserManagementPage() {
       if (invalid.length) return "Unknown groups: " + invalid.join(", ");
     }
 
-    // Password policy 8–10 (only required for create)
+    // Password validation
     if (isNew) {
-      if (!r.password || r.password.length < 8 || r.password.length > 10)
-        return "Password must be 8-10 characters.";
-    } else if (r.password && (r.password.length < 8 || r.password.length > 10)) {
-      return "Password must be 8-10 characters.";
+      if (!r.password || !/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(r.password)) {
+        return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
+    } else if (r.password && !/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(r.password)) {
+      return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
     }
     return "";
+  }
   };
 
   const saveRow = async (row) => {
@@ -176,6 +178,11 @@ export default function UserManagementPage() {
     setRows((prev) =>
       prev.map((r) => (r.username === row.username ? { ...r, rowErr: err } : r))
     );
+    setTimeout(() => {
+      setRows((prev) =>
+        prev.map((r) => (r.username === row.username ? { ...r, rowErr: "" } : r))
+      );
+    }, 5000);
     if (err) return;
 
     // Determine changes vs __orig (username is immutable)
@@ -253,12 +260,25 @@ export default function UserManagementPage() {
             : r
         )
       );
+      setTimeout(() => {
+        setRows((prev) =>
+          prev.map((r) =>
+            r.username === row.username ? { ...r, rowErr: "" } : r
+          )
+        );
+      }, 5000);
     }
   };
 
   const createUser = async () => {
+    if (!canCreate) {
+      setCreateErr("Field(s) cannot be empty.");
+      setTimeout(() => setCreateErr(""), 5000);
+      return;
+    }
     const err = validateRow(newUser, true);
     setCreateErr(err);
+    setTimeout(() => setCreateErr(""), 5000);
     if (err) return;
 
     setCreating(true);
@@ -325,6 +345,7 @@ export default function UserManagementPage() {
         e?.response?.data?.error ||
           (e instanceof Error ? e.message : String(e))
       );
+      setTimeout(() => setCreateErr(""), 5000);
     } finally {
       setCreating(false);
     }
@@ -483,7 +504,7 @@ export default function UserManagementPage() {
                   <td className="px-4 py-2">
                     <button
                       className="rounded-md bg-emerald-600 px-3 py-2 text-white disabled:opacity-60 block w-full"
-                      disabled={!canCreate}
+                      // disabled={!canCreate}
                       onClick={createUser}
                     >
                       {creating ? "Creating…" : "Add User"}

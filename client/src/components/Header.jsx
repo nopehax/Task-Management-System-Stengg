@@ -93,7 +93,7 @@ export default function HeaderPage() {
                 className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 role="menuitem"
               >
-                Home
+                Applications
               </button>
               {user?.userGroups?.includes("admin") && (
                 <button

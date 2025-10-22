@@ -32,11 +32,11 @@ const LoginPage = () => {
     e.preventDefault();
     const newErrors = [];
 
-    if (!username.trim()) newErrors.push("Username is required.");
-    if (!password) newErrors.push("Password is required.");
+    if (!username.trim() || !password) newErrors.push("Invalid username or password.");
 
     if (newErrors.length) {
       setErrors(newErrors);
+      setTimeout(() => setErrors([]), 5000);
       return;
     }
 
@@ -48,57 +48,77 @@ const LoginPage = () => {
     } catch (err) {
       const msg = err?.message || "Login failed. Please check your credentials.";
       setErrors([msg]);
+      setTimeout(() => setErrors([]), 5000);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col flex-auto justify-center items-center min-h-0 overflow-auto">
-      <form className="flex flex-col flex-initial" onSubmit={handleSubmit} noValidate autoComplete="off">
-        <h1 className="text-2xl font-medium mb-4">Sign in</h1>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <label htmlFor="username">Username</label>
-          <input
-            id="username"
-            className="border-2 border-black rounded-md text-sm"
-            type="text"
-            autoComplete="new-password"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            disabled={loading}
-            required
-          />
+    <div className="min-h-screen w-full bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center p-4">
+      <form
+        className="w-full max-w-md rounded-3xl bg-white shadow-2xl p-8 sm:p-10"
+        onSubmit={handleSubmit}
+        noValidate
+        autoComplete="off"
+      >
+        <h1 className="text-3xl font-semibold text-slate-800 text-center mb-8">
+          Login
+        </h1>
 
-          <label htmlFor="password" style={{ marginTop: "10px" }}>
-            Password
-          </label>
-          <input
-            id="password"
-            className="border-2 border-black rounded-md text-sm"
-            type="password"
-            autoComplete="off"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-            required
-          />
+        <div className="space-y-5">
+          <div className="flex flex-col">
+            <label htmlFor="username" className="text-sm font-medium text-slate-600">
+              Username
+            </label>
+            <input
+              id="username"
+              className="mt-2 h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-300/60"
+              type="text"
+              autoComplete="new-password"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={loading}
+              required
+            />
+          </div>
 
-          <button className="my-8 bg-gray-300 self-center px-8 py-1 rounded-md" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+          <div className="flex flex-col">
+            <label htmlFor="password" className="text-sm font-medium text-slate-600">
+              Password
+            </label>
+            <input
+              id="password"
+              className="mt-2 h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm text-slate-800 outline-none focus:border-slate-300 focus:ring-2 focus:ring-slate-300/60"
+              type="password"
+              autoComplete="off"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+              required
+            />
+          </div>
+
+          <button
+            className="mt-2 h-11 w-full rounded-xl bg-gray-500 text-white font-semibold shadow-md hover:bg-gray-600 disabled:opacity-60"
+            type="submit"
+            disabled={loading}
+          >
+            {loading ? "Signing in..." : "Log In"}
           </button>
         </div>
-      </form>
 
-      <div className="flex text-sm justify-center font-medium text-red-500" aria-live="polite">
-        {errors.length > 0 && (
-          <ul>
-            {errors.map((msg, i) => (
-              <li key={i}>{msg}</li>
-            ))}
-          </ul>
-        )}
-      </div>
+        {/* Errors */}
+        <div className="mt-6 text-center text-sm font-medium text-red-600 min-h-5" aria-live="polite">
+          {errors.length > 0 && (
+            <ul className="space-y-1">
+              {errors.map((msg, i) => (
+                <li key={i}>{msg}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </form>
     </div>
   );
 };

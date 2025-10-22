@@ -41,8 +41,8 @@ export default function UserProfilePage() {
 
   const validate = () => {
     if (!form.email?.trim()) return "Email is required.";
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRe.test(form.email)) return "Email looks invalid.";
+    const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRe.test(form.email)) return "Email must be valid.";
 
     const wantsPwd =
       form.password.length > 0 ||
@@ -51,8 +51,8 @@ export default function UserProfilePage() {
 
     if (wantsPwd) {
       if (!form.currentPassword) return "Current password is required.";
-      if (form.password.length < 8 || form.password.length > 10)
-        return "New password must be 8–10 characters.";
+      if (!/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(form.password))
+        return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
       if (form.password !== form.confirmPassword)
         return "Passwords do not match.";
     }
@@ -67,6 +67,7 @@ export default function UserProfilePage() {
     const v = validate();
     if (v) {
       setError(v);
+      setTimeout(() => setError(""), 5000);
       return;
     }
 
@@ -82,6 +83,7 @@ export default function UserProfilePage() {
 
     if (Object.keys(payload).length === 0) {
       setError("No changes to save.");
+      setTimeout(() => setError(""), 5000);
       return;
     }
 
@@ -106,6 +108,7 @@ export default function UserProfilePage() {
         err.message ||
         "Save failed. Please try again.";
       setError(msg);
+      setTimeout(() => setError(""), 5000);
     } finally {
       setSaving(false);
     }
@@ -150,7 +153,6 @@ export default function UserProfilePage() {
           <div className="pt-2">
             <label className="block text-sm text-slate-700 mb-1">Email</label>
             <input
-              type="email"
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
               value={form.email}
               onChange={onChange("email")}
@@ -168,7 +170,7 @@ export default function UserProfilePage() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
               value={form.currentPassword}
               onChange={onChange("currentPassword")}
-              placeholder="required to change password"
+              placeholder="********"
             />
           </div>
 
@@ -179,7 +181,7 @@ export default function UserProfilePage() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
               value={form.password}
               onChange={onChange("password")}
-              placeholder="8–10 characters"
+              placeholder="********"
             />
           </div>
 
@@ -192,7 +194,7 @@ export default function UserProfilePage() {
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
               value={form.confirmPassword}
               onChange={onChange("confirmPassword")}
-              placeholder="repeat new password"
+              placeholder="********"
             />
           </div>
 
