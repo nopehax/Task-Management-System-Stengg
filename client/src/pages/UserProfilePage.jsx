@@ -173,7 +173,7 @@ export default function UserProfilePage() {
           </div>
 
           <div>
-            <label className="block text-sm text-slate-700 mb-1">Password</label>
+            <label className="block text-sm text-slate-700 mb-1">New Password</label>
             <input
               type="password"
               className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"

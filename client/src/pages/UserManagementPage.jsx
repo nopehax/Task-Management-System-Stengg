@@ -576,8 +576,8 @@ export default function UserManagementPage() {
 
                       <td className="px-4 py-2">
                         <button
-                          className={["rounded-md bg-blue-600 px-3 py-2 text-white disabled:opacity-60 block w-full",
-                            canSave ? "hover:bg-blue-700" : "cursor-not-allowed bg-slate-400"
+                          className={["rounded-md bg-blue-600 px-3 py-2 text-white block w-full",
+                            canSave ? "hover:bg-blue-700" : "cursor-not-allowed opacity-50"
                           ].join(" ")}
                           disabled={!canSave}
                           onClick={() => saveRow(r)}
