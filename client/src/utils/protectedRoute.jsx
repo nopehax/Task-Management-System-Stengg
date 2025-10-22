@@ -9,7 +9,7 @@ const ProtectedRoute = ({ allow }) => {
   if (!ready) return null;
 
   if (!isAuthenticated || !user?.active) {
-    return <Navigate to="/" replace state={{ from: location }} />;
+    return <Navigate to="/" replace />;
   }
 
   // If no allow list, it's just an auth gate

@@ -14,8 +14,8 @@ import UserProfilePage from './pages/UserProfilePage';
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           <Route path="/" element={<App />} />
           <Route path="/403" element={<NotAuthorizedPage />} />
@@ -30,8 +30,8 @@ root.render(
             <Route path="/usermanage" element={<UserManagementPage />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
 

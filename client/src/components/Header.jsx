@@ -36,7 +36,7 @@ export default function HeaderPage() {
   const handleLogout = async () => {
     setOpen(false);
     await logout();
-    navigate("/", { replace: true });
+    navigate("/", { replace: true, state: {} });
   };
 
   const handleProfile = () => {
