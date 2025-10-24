@@ -356,14 +356,17 @@ export default function UserManagementPage() {
     const normalized = normalizeStr(newGroupName);
     if (!normalized) {
       setGroupErr("Invalid group name.");
+      setTimeout(() => setGroupErr(""), 5000)
       return;
     }
     if (normalized.length > 50) {
       setGroupErr("Max length is 50.");
+      setTimeout(() => setGroupErr(""), 5000)
       return;
     }
     if (groups.includes(normalized)) {
       setGroupErr("Group already exists.");
+      setTimeout(() => setGroupErr(""), 5000)
       return;
     }
 
@@ -382,6 +385,7 @@ export default function UserManagementPage() {
           (e instanceof Error ? e.message : String(e)) ||
           "Failed to add group"
       );
+      setTimeout(() => setGroupErr(""), 5000)
     } finally {
       setGroupAdding(false);
     }
