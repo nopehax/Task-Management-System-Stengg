@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const userGroupsRoutes = require('./routes/usergroups');
 const applicationsRoutes = require('./routes/applications');
+const plansRoutes = require('./routes/plans');
 
 
 const corsOptions = {
@@ -31,6 +32,7 @@ app.use('/api', authRoutes);
 app.use('/api', usersRoutes);
 app.use('/api', userGroupsRoutes);
 app.use('/api', applicationsRoutes);
+app.use('/api', plansRoutes);
 
 
 // startup
