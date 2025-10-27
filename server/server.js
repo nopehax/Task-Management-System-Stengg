@@ -9,6 +9,8 @@ const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const userGroupsRoutes = require('./routes/usergroups');
+const applicationsRoutes = require('./routes/applications');
+
 
 const corsOptions = {
   origin: "http://localhost:3001",
@@ -28,6 +30,8 @@ app.get('/api/check', async (_req, res) => res.sendStatus(200).send("server is u
 app.use('/api', authRoutes);
 app.use('/api', usersRoutes);
 app.use('/api', userGroupsRoutes);
+app.use('/api', applicationsRoutes);
+
 
 // startup
 const PORT = 3000;
