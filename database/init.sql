@@ -58,7 +58,7 @@ CREATE TABLE tasks (
   Task_id VARCHAR(50) NOT NULL,
   Task_plan VARCHAR(50) NOT NULL,
   Task_app_acronym VARCHAR(50) NOT NULL,
-  Task_state ENUM('Open', 'ToDo', 'Doing', 'Done') NOT NULL,
+  Task_state ENUM('Open', 'ToDo', 'Doing', 'Done', 'Closed') NOT NULL,
   Task_creator VARCHAR(50) NOT NULL,
   Task_owner VARCHAR(50) NOT NULL,
   Task_createDate DATE NOT NULL,

@@ -352,8 +352,16 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
   } = req.body || {};
 
   // check that user is allowed to edit this task
-  const permit = 'App_permit_' + Task_state;
-  const [rows] = await pool.query(
+  let [rows] = await pool.query(
+        `SELECT Task_state
+           FROM tasks
+          WHERE Task_id = ?
+          LIMIT 1`,
+        [taskId]
+      );
+  const taskCurrState = rows[0].Task_state
+  const permit = 'App_permit_' + taskCurrState;
+  [rows] = await pool.query(
     `SELECT ?
       FROM applications
       WHERE App_Acronym = ?
@@ -421,14 +429,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
         await conn.rollback();
         return res.status(400).json({ error: "Invalid Task_state" });
       }
-      const [rows] = await conn.query(
-        `SELECT Task_state
-           FROM tasks
-          WHERE Task_id = ?
-          LIMIT 1`,
-        [taskId]
-      );
-      const taskCurrState = rows[0].Task_state
+      
       const stateChangeNote = {
         author: taskOwner,
         status: taskCurrState,
