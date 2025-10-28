@@ -11,6 +11,7 @@ const usersRoutes = require('./routes/users');
 const userGroupsRoutes = require('./routes/usergroups');
 const applicationsRoutes = require('./routes/applications');
 const plansRoutes = require('./routes/plans');
+const tasksRoutes = require('./routes/tasks');
 
 
 const corsOptions = {
@@ -33,6 +34,7 @@ app.use('/api', usersRoutes);
 app.use('/api', userGroupsRoutes);
 app.use('/api', applicationsRoutes);
 app.use('/api', plansRoutes);
+app.use('/api', tasksRoutes);
 
 
 // startup
