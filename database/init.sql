@@ -34,7 +34,7 @@ CREATE TABLE applications (
   App_endDate DATE NOT NULL,
   App_permit_Create JSON NOT NULL,
   App_permit_Open JSON NOT NULL,
-  App_permit_ToDoList JSON NOT NULL,
+  App_permit_ToDo JSON NOT NULL,
   App_permit_Doing JSON NOT NULL,
   App_permit_Done JSON NOT NULL,
   PRIMARY KEY (App_Acronym)
@@ -83,7 +83,7 @@ INSERT INTO accounts (username, email, password, active, userGroups) VALUES
   ('inactive', 'null@null.com', '$2b$12$JC407angGDbdviFYAgefXed8evLSrx5zMbInSyunzALggKjLUa0Ei', 0, '["dev team"]');
 
 -- Seed applications
-INSERT INTO applications (App_Acronym, App_Description, App_Rnumber, App_startDate, App_endDate, App_permit_Create, App_permit_Open, App_permit_ToDoList, App_permit_Doing, App_permit_Done) VALUES
+INSERT INTO applications (App_Acronym, App_Description, App_Rnumber, App_startDate, App_endDate, App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done) VALUES
   ('Project A', 'first app yay', 0, '2022-01-01', '2022-01-31', '["project lead"]', '["project manager"]', '["project manager", "dev team"]', '["dev team"]', '["project lead"]'),
   ('pipedream', 'someones pipedream', 1, '2022-02-01', '2022-02-28', '["project lead"]', '["project manager"]', '["project manager", "dev team"]', '["dev team"]', '["project lead"]');
 

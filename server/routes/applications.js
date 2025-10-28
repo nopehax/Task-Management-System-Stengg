@@ -21,7 +21,7 @@ function normalizeRow(row) {
     App_endDate: row.App_endDate || "",
     App_permit_Create: [],
     App_permit_Open: [],
-    App_permit_ToDoList: [],
+    App_permit_ToDo: [],
     App_permit_Doing: [],
     App_permit_Done: [],
   };
@@ -30,7 +30,7 @@ function normalizeRow(row) {
   const jsonFields = [
     "App_permit_Create",
     "App_permit_Open",
-    "App_permit_ToDoList",
+    "App_permit_ToDo",
     "App_permit_Doing",
     "App_permit_Done",
   ];
@@ -64,7 +64,7 @@ router.get("/applications", authRequired, async (req, res) => {
     const [rows] = await pool.query(
       `SELECT App_Acronym, App_Description, App_Rnumber,
               App_startDate, App_endDate,
-              App_permit_Create, App_permit_Open, App_permit_ToDoList, App_permit_Doing, App_permit_Done
+              App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
          FROM applications
          ORDER BY App_Acronym ASC`
     );
@@ -93,7 +93,7 @@ router.post(
         App_endDate,
         App_permit_Create,
         App_permit_Open,
-        App_permit_ToDoList,
+        App_permit_ToDo,
         App_permit_Doing,
         App_permit_Done,
       } = req.body || {};
@@ -142,12 +142,12 @@ router.post(
       const groupsOk =
         ensureArrayOfStrings(App_permit_Create) &&
         ensureArrayOfStrings(App_permit_Open) &&
-        ensureArrayOfStrings(App_permit_ToDoList) &&
+        ensureArrayOfStrings(App_permit_ToDo) &&
         ensureArrayOfStrings(App_permit_Doing) &&
         ensureArrayOfStrings(App_permit_Done) &&
         App_permit_Create.length > 0 &&
         App_permit_Open.length > 0 &&
-        App_permit_ToDoList.length > 0 &&
+        App_permit_ToDo.length > 0 &&
         App_permit_Doing.length > 0 &&
         App_permit_Done.length > 0;
 
@@ -163,18 +163,18 @@ router.post(
         INSERT INTO applications
          (App_Acronym, App_Description, App_Rnumber,
           App_startDate, App_endDate,
-          App_permit_Create, App_permit_Open, App_permit_ToDoList, App_permit_Doing, App_permit_Done)
+          App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done)
         VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const params = [
         App_Acronym.trim(),
         App_Description.trim(),
-        App_startDate, // already yyyy-MM-dd
-        App_endDate, // already yyyy-MM-dd
+        App_startDate,
+        App_endDate,
         JSON.stringify(App_permit_Create),
         JSON.stringify(App_permit_Open),
-        JSON.stringify(App_permit_ToDoList),
+        JSON.stringify(App_permit_ToDo),
         JSON.stringify(App_permit_Doing),
         JSON.stringify(App_permit_Done),
       ];
@@ -185,7 +185,7 @@ router.post(
       const [rows] = await pool.query(
         `SELECT App_Acronym, App_Description, App_Rnumber,
                 App_startDate, App_endDate,
-                App_permit_Create, App_permit_Open, App_permit_ToDoList, App_permit_Doing, App_permit_Done
+                App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
            FROM applications
           WHERE App_Acronym = ?`,
         [App_Acronym.trim()]

@@ -148,7 +148,7 @@ const ApplicationPage = () => {
         App_endDate: endDate,
         App_permit_Create: permitCreate,
         App_permit_Open: permitOpen,
-        App_permit_ToDoList: permitToDo,
+        App_permit_ToDo: permitToDo,
         App_permit_Doing: permitDoing,
         App_permit_Done: permitDone,
       };
@@ -360,7 +360,7 @@ const ApplicationPage = () => {
                     <Chips items={a.App_permit_Open} />
                   </td>
                   <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_ToDoList} />
+                    <Chips items={a.App_permit_ToDo} />
                   </td>
                   <td className="px-3 py-3 align-top">
                     <Chips items={a.App_permit_Doing} />
