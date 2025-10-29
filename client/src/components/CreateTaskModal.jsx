@@ -25,6 +25,7 @@ export default function CreateTaskModal({
   onClose,
   onCreate,
   canUserCreate,
+  error
 }) {
   const [Task_app_acronym, setTaskApp] = useState("");
   const [Task_name, setTaskName] = useState("");
@@ -171,6 +172,7 @@ export default function CreateTaskModal({
                 You are not permitted to create tasks for this application.
               </div>
             ) : null}
+            {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
           </div>
         </div>
       </div>

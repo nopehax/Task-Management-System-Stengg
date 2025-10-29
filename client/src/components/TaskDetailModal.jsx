@@ -66,6 +66,7 @@ export default function TaskDetailModal({
   onChangeState,
   canModifyCurrentState,
   onAddNote,
+  error
 }) {
   const [noteDraft, setNoteDraft] = useState("");
 
@@ -291,10 +292,7 @@ export default function TaskDetailModal({
           </div>
         </div>
 
-        {/* In Done state we may want to show a subtle hint about plan/approve behavior.
-            We're not rendering that hint text here by default, but if you want:
-            - "Approving is disabled because you changed the plan"
-            you could add conditional helper text below the buttons. */}
+        {error && <div className="text-red-600">{error}</div>}
       </div>
     </div>
   );

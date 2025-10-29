@@ -16,6 +16,7 @@ export default function CreatePlanModal({
   canCreatePlan,
   onClose,
   onCreate,
+  error
 }) {
   const [Plan_MVP_name, setName] = useState("");
   const [Plan_app_acronym, setAcronym] = useState("");
@@ -134,6 +135,8 @@ export default function CreatePlanModal({
                 You are not permitted to create plans.
               </div>
             ) : null}
+
+            {error && <div className="text-xs text-red-600 mt-2">{error}</div>}
           </div>
         </div>
       </div>

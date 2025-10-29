@@ -61,6 +61,11 @@ export default function TaskPage() {
   const [origPlan, setOrigPlan] = useState("");
   const [editedPlan, setEditedPlan] = useState("");
 
+  // error messages
+  const [createTaskError, setCreateTaskError] = useState("");
+  const [createPlanError, setCreatePlanError] = useState("");
+  const [taskModalError, setTaskModalError] = useState("");
+
   const isProjectManager =
     hasAnyGroup && hasAnyGroup("project manager");
 
@@ -198,7 +203,8 @@ export default function TaskPage() {
         closeCreatePlan();
       }
     } catch (err) {
-      // could surface err.response?.data?.error later
+      setCreatePlanError(err.response?.data?.error);
+      setTimeout(() => setCreatePlanError(""), 5000);
     }
   }
 
@@ -223,7 +229,8 @@ export default function TaskPage() {
         closeCreateTask();
       }
     } catch (err) {
-      // could surface err.response?.data?.error in modal
+      setCreateTaskError(err.response?.data?.error);
+      setTimeout(() => setCreateTaskError(""), 5000);
     }
   }
 
@@ -396,7 +403,8 @@ export default function TaskPage() {
         // orig/editedPlan will resync via useEffect.
       }
     } catch (err) {
-      // could surface error (403, etc.)
+      setTaskModalError(err.response?.data?.error);
+      setTimeout(() => setTaskModalError(""), 5000);
     }
   }
 
@@ -426,7 +434,8 @@ export default function TaskPage() {
         );
       }
     } catch (err) {
-      // could surface error
+      setTaskModalError(err.response?.data?.error);
+      setTimeout(() => setTaskModalError(""), 5000);
     }
   }
 
@@ -536,6 +545,7 @@ export default function TaskPage() {
             // notes / perms
             canModifyCurrentState={canModifyCurrentState}
             onAddNote={handleAddNote}
+            error={taskModalError}
           />
         ) : null}
 
@@ -547,6 +557,7 @@ export default function TaskPage() {
             onClose={closeCreateTask}
             onCreate={handleCreateTask}
             canUserCreate={canUserCreateTaskForApp}
+            error={createTaskError}
           />
         ) : null}
 
@@ -557,6 +568,7 @@ export default function TaskPage() {
             canCreatePlan={isProjectManager}
             onClose={closeCreatePlan}
             onCreate={handleCreatePlan}
+            error={createPlanError}
           />
         ) : null}
       </div>
