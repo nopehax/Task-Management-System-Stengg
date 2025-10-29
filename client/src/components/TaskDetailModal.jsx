@@ -20,50 +20,96 @@ import { formatDisplayDate, formatPlanRange } from "../utils/date";
  *     Task_notes: [ {author, status, datetime, note?, message?}, ... ]
  *   }
  *
- * - plans: array of all plans [{Plan_MVP_name, Plan_startDate, Plan_endDate, Plan_app_acronym}, ...]
+ * - plans: array of all plans
+ *   [{Plan_MVP_name, Plan_startDate, Plan_endDate, Plan_app_acronym}, ...]
+ *
  * - onClose(): close modal
  *
- * - onChangePlan(newPlanNameOrEmpty): PATCH task_plan
- * - onReleaseTask(): PATCH to move from Open -> ToDo
- * - onAddNote(noteText): PATCH append note
+ * - planMode:
+ *   "read-only"
+ *   "edit-apply-now"           // state=Open: PATCH immediately on change
+ *   "edit-stash-for-reject"    // state=Done: stage locally, only send on Reject
  *
- * - canModifyCurrentState: boolean (can add note / change plan)
- * - canRelease: boolean (can press Release Task)
+ * - origPlan: string (task.Task_plan when modal opened)
+ * - editedPlan: string (current dropdown selection in the modal UI)
+ * - onImmediatePlanChange(newPlanNameOrEmpty): PATCH immediately (Open only)
+ * - onSelectPlanLocal(newPlanNameOrEmpty): update editedPlan in parent (Done only)
+ *
+ * - stateActions: array of { label, toState, disabled }
+ *   e.g. [{ label:"Release Task", toState:"ToDo", disabled:false }]
+ *   For "Done": [
+ *     { label:"Approve Task", toState:"Closed", disabled:(plan changed?) },
+ *     { label:"Reject Task",  toState:"Doing",  disabled:false }
+ *   ]
+ *   For "Closed": []
+ *
+ * - onChangeState(targetState): called when clicking any state action button.
+ *   Special cases are handled in TaskPage (Done->Doing also applies staged plan if changed)
+ *
+ * - canModifyCurrentState: boolean
+ *   Controls:
+ *   - whether Add Note box is enabled
+ *   - whether dropdown is enabled in allowed modes
+ *
+ * - onAddNote(noteText): PATCH append note
  */
 export default function TaskDetailModal({
   task,
   plans,
   onClose,
-  onChangePlan,
-  onReleaseTask,
-  onAddNote,
+  planMode,
+  origPlan,
+  editedPlan,
+  onImmediatePlanChange,
+  onSelectPlanLocal,
+  stateActions,
+  onChangeState,
   canModifyCurrentState,
-  canRelease,
+  onAddNote,
 }) {
   const [noteDraft, setNoteDraft] = useState("");
-
-  // Helper to find the current plan info
-  const currentPlan = task.Task_plan
-    ? plans.find((p) => p.Plan_MVP_name === task.Task_plan)
-    : null;
 
   const createdOnDisplay = task.Task_createDate
     ? formatDisplayDate(task.Task_createDate)
     : "";
 
-  // Plan dropdown options:
-  //  - ""   => No plan
-  //  - rest => from plans array, show "PlanName (date range)"
+  const isClosed = task.Task_state === "Closed";
+
+  // --- Plan dropdown handling ---
+  // The dropdown is:
+  // - disabled completely in read-only mode OR Closed OR when user lacks permission
+  // - in "edit-apply-now": value = task.Task_plan; onChange -> PATCH immediately
+  // - in "edit-stash-for-reject": value = editedPlan; onChange -> just stage locally
+  //
+  const planDropdownDisabled =
+    planMode === "read-only" || isClosed || !canModifyCurrentState;
+
+  const planSelectValue =
+    planMode === "edit-stash-for-reject"
+      ? editedPlan || ""
+      : task.Task_plan || "";
+
   function handlePlanSelect(e) {
-    onChangePlan(e.target.value); // "" or Plan_MVP_name
+    const newVal = e.target.value; // "" or Plan_MVP_name
+    if (planMode === "edit-apply-now") {
+      // Open state: apply immediately
+      onImmediatePlanChange(newVal);
+    } else if (planMode === "edit-stash-for-reject") {
+      // Done state: just stage locally
+      onSelectPlanLocal(newVal);
+    }
+    // read-only mode won't trigger because dropdown is disabled
   }
 
+  // --- Notes handling ---
   function handleAddNote() {
     const trimmed = noteDraft.trim();
     if (!trimmed) return;
     onAddNote(trimmed);
     setNoteDraft("");
   }
+
+  // --- Render ---
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 overflow-auto py-10 px-4">
@@ -123,7 +169,9 @@ export default function TaskDetailModal({
 
               <div>
                 <div className="font-medium text-gray-500">Created On:</div>
-                <div className="text-gray-800">{createdOnDisplay || "—"}</div>
+                <div className="text-gray-800">
+                  {createdOnDisplay || "—"}
+                </div>
               </div>
             </div>
 
@@ -135,9 +183,9 @@ export default function TaskDetailModal({
 
               <select
                 className="w-full border rounded px-2 py-2 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                value={task.Task_plan || ""}
+                value={planSelectValue}
                 onChange={handlePlanSelect}
-                disabled={!canModifyCurrentState}
+                disabled={planDropdownDisabled}
               >
                 <option value="">— No plan —</option>
                 {plans.map((p) => {
@@ -155,19 +203,31 @@ export default function TaskDetailModal({
               </select>
             </div>
 
-            {/* Release Task button */}
-            <div>
-              <button
-                className={`text-sm font-medium rounded px-4 py-2 ${
-                  canRelease
-                    ? "bg-indigo-600 text-white hover:bg-indigo-700"
-                    : "bg-indigo-200 text-white cursor-not-allowed"
-                }`}
-                disabled={!canRelease}
-                onClick={onReleaseTask}
-              >
-                Release Task
-              </button>
+            {/* State action buttons (Release Task / Pick Up Task / etc) */}
+            <div className="flex flex-wrap gap-2">
+              {stateActions && stateActions.length > 0 ? (
+                stateActions.map((action, idx) => (
+                  <button
+                    key={idx}
+                    className={`text-sm font-medium rounded px-4 py-2 ${
+                      action.disabled
+                        ? "bg-indigo-200 text-white cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700"
+                    }`}
+                    disabled={action.disabled}
+                    onClick={() => {
+                      if (!action.disabled) {
+                        onChangeState(action.toState);
+                      }
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                ))
+              ) : (
+                // In Closed state or no available actions, render nothing
+                null
+              )}
             </div>
           </div>
 
@@ -201,33 +261,40 @@ export default function TaskDetailModal({
             </div>
 
             {/* Add note */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Entry
-              </label>
-              <textarea
-                className="w-full border rounded px-2 py-2 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
-                rows={3}
-                placeholder="Insert Entry Here..."
-                disabled={!canModifyCurrentState}
-                value={noteDraft}
-                onChange={(e) => setNoteDraft(e.target.value)}
-              />
+            {!isClosed && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Entry
+                </label>
+                <textarea
+                  className="w-full border rounded px-2 py-2 text-sm bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                  rows={3}
+                  placeholder="Insert Entry Here..."
+                  disabled={!canModifyCurrentState}
+                  value={noteDraft}
+                  onChange={(e) => setNoteDraft(e.target.value)}
+                />
 
-              <button
-                className={`mt-2 text-sm font-medium rounded px-4 py-2 ${
-                  canModifyCurrentState && noteDraft.trim()
-                    ? "bg-gray-800 text-white hover:bg-gray-900"
-                    : "bg-gray-300 text-white cursor-not-allowed"
-                }`}
-                disabled={!canModifyCurrentState || !noteDraft.trim()}
-                onClick={handleAddNote}
-              >
-                Add Note
-              </button>
-            </div>
+                <button
+                  className={`mt-2 text-sm font-medium rounded px-4 py-2 ${
+                    canModifyCurrentState && noteDraft.trim()
+                      ? "bg-gray-800 text-white hover:bg-gray-900"
+                      : "bg-gray-300 text-white cursor-not-allowed"
+                  }`}
+                  disabled={!canModifyCurrentState || !noteDraft.trim()}
+                  onClick={handleAddNote}
+                >
+                  Add Note
+                </button>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* In Done state we may want to show a subtle hint about plan/approve behavior.
+            We're not rendering that hint text here by default, but if you want:
+            - "Approving is disabled because you changed the plan"
+            you could add conditional helper text below the buttons. */}
       </div>
     </div>
   );

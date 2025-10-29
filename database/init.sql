@@ -95,7 +95,7 @@ INSERT INTO plans (Plan_MVP_name, Plan_startDate, Plan_endDate, Plan_app_acronym
   ('init pipedream', '2022-03-29', '2022-04-05', 'pipedream');
 
 -- Seed tasks
-INSERT INTO tasks (Task_name, Task_description, Task_notes, Task_id, Task_plan, Task_app_acronym, Task_state, Task_creator, Task_owner, Task_createDate) VALUES
-  ('init', 'init', '{}', '0', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
-  ('init', 'init', '{}', '1', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
-  ('init', 'init', '{}', '2', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01');
+-- INSERT INTO tasks (Task_name, Task_description, Task_notes, Task_id, Task_plan, Task_app_acronym, Task_state, Task_creator, Task_owner, Task_createDate) VALUES
+--   ('init', 'init', '{}', '0', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
+--   ('init', 'init', '{}', '1', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
+--   ('init', 'init', '{}', '2', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01');

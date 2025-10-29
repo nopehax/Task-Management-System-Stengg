@@ -38,7 +38,7 @@ function normalizeTaskRow(row) {
 }
 
 function isValidState(s) {
-  return s === "Open" || s === "ToDo" || s === "Doing" || s === "Done";
+  return s === "Open" || s === "ToDo" || s === "Doing" || s === "Done" || s === "Closed";
 }
 
 // helper: validate Task_notes shape

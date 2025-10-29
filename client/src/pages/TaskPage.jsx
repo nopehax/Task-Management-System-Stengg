@@ -16,20 +16,34 @@ const api = axios.create({
   headers: { Accept: "application/json" },
 });
 
-// Map task state -> which application permit array controls actions
+// Map current task state -> which application permit field controls actions/edits
+// Closed is fully locked, so we won't even consult permits for Closed.
 const PERMIT_FIELD_BY_STATE = {
   Open: "App_permit_Open",
   ToDo: "App_permit_ToDo",
   Doing: "App_permit_Doing",
   Done: "App_permit_Done",
-  Closed: "App_permit_Done", // fallback until you define Closed-specific permit
+  Closed: null,
 };
 
-// "Release Task" means move from Open -> ToDo
-const RELEASE_TARGET_STATE = "ToDo";
+// State transition definitions based on CURRENT state
+// Each entry is an array of { label, toState }
+const STATE_TRANSITIONS = {
+  Open: [{ label: "Release Task", toState: "ToDo" }],
+  ToDo: [{ label: "Pick Up Task", toState: "Doing" }],
+  Doing: [
+    { label: "Review Task", toState: "Done" },
+    { label: "Drop Task", toState: "ToDo" },
+  ],
+  Done: [
+    { label: "Approve Task", toState: "Closed" },
+    { label: "Reject Task", toState: "Doing" },
+  ],
+  Closed: [],
+};
 
 export default function TaskPage() {
-  const { ready, isAuthenticated, hasAnyGroup, username } = useAuth();
+  const { ready, isAuthenticated, hasAnyGroup, user } = useAuth();
 
   // data
   const [tasks, setTasks] = useState([]);
@@ -40,6 +54,12 @@ export default function TaskPage() {
   const [activeTaskId, setActiveTaskId] = useState(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreatePlan, setShowCreatePlan] = useState(false);
+
+  // For the active task modal's plan editing behavior:
+  // - origPlan: Task_plan value when modal opened
+  // - editedPlan: user's currently selected plan in the modal (may differ in Done state)
+  const [origPlan, setOrigPlan] = useState("");
+  const [editedPlan, setEditedPlan] = useState("");
 
   const isProjectManager =
     hasAnyGroup && hasAnyGroup("project manager");
@@ -58,7 +78,6 @@ export default function TaskPage() {
 
         if (!mounted) return;
 
-        // expect arrays
         const taskList = Array.isArray(tasksRes.data)
           ? tasksRes.data
           : [];
@@ -125,38 +144,31 @@ export default function TaskPage() {
     const app = appMap[appAcronym];
     if (!app || !hasAnyGroup) return false;
     const allowed = app.App_permit_Create || [];
-    return hasAnyGroup(allowed);
+    return hasAnyGroup(...allowed);
   }
 
   // can the current user act on a task in its *current* state?
-  // used to enable: Add Note, changing plan dropdown, etc.
-  function canUserModifyCurrentTask(task) {
+  // This governs:
+  // - state transition buttons
+  // - Add Note
+  // - plan editing (where allowed)
+  function canUserActOnTask(task) {
+    if (!task) return false;
+    if (task.Task_state === "Closed") return false; // Closed is hard-locked
     const app = appMap[task.Task_app_acronym];
     if (!app || !hasAnyGroup) return false;
     const field = PERMIT_FIELD_BY_STATE[task.Task_state];
     if (!field) return false;
     const allowedGroups = app[field] || [];
-    return hasAnyGroup(allowedGroups);
+    return hasAnyGroup(...allowedGroups);
   }
 
-  // can the current user "Release Task" (Open -> ToDo)?
-  function canUserReleaseTask(task) {
-    // If the task is already not Open, maybe we hide/disable anyway.
-    if (task.Task_state !== "Open") return false;
-    const app = appMap[task.Task_app_acronym];
-    if (!app || !hasAnyGroup) return false;
-    // releasing to ToDo means check App_permit_ToDo
-    const field = PERMIT_FIELD_BY_STATE[RELEASE_TARGET_STATE];
-    if (!field) return false;
-    const allowedGroups = app[field] || [];
-    return hasAnyGroup(allowedGroups);
-  }
-
-  // ----- EVENT HANDLERS -----
+  // ----- MODAL OPEN/CLOSE -----
 
   function openTaskModal(taskId) {
     setActiveTaskId(taskId);
   }
+
   function closeTaskModal() {
     setActiveTaskId(null);
   }
@@ -175,33 +187,25 @@ export default function TaskPage() {
     setShowCreatePlan(false);
   }
 
-  // Create Plan submit
+  // ----- CREATE PLAN SUBMIT -----
   async function handleCreatePlan(payload) {
     // payload = { Plan_MVP_name, Plan_app_acronym, Plan_startDate, Plan_endDate }
     try {
       const res = await api.post("/plans", payload);
-      const created = res.data; // single plan object
+      const created = res.data;
       if (created) {
         setPlans((prev) => [created, ...prev]);
         closeCreatePlan();
       }
     } catch (err) {
-      // surface server error message here in future if needed
-      // (e.g. toast or inline)
+      // could surface err.response?.data?.error later
     }
   }
 
-  // Create Task submit
+  // ----- CREATE TASK SUBMIT -----
   async function handleCreateTask(payload) {
     // payload = { Task_app_acronym, Task_name, Task_description, Task_plan }
-    // We always create in "Open".
-    // Backend expects:
-    //   Task_name
-    //   Task_description
-    //   Task_plan ("" allowed)
-    //   Task_app_acronym
-    //   Task_state ("Open")
-    //   Task_creator (username)
+    // Always create in "Open".
     try {
       const body = {
         Task_name: payload.Task_name,
@@ -209,23 +213,80 @@ export default function TaskPage() {
         Task_plan: payload.Task_plan || "",
         Task_app_acronym: payload.Task_app_acronym,
         Task_state: "Open",
-        Task_creator: username || "", // from auth context
+        Task_creator: user.username || "",
       };
 
       const res = await api.post("/tasks", body);
-      const createdTask = res.data; // single task object
+      const createdTask = res.data;
       if (createdTask) {
         setTasks((prev) => [createdTask, ...prev]);
         closeCreateTask();
       }
     } catch (err) {
-      // in future, show err.response?.data?.error under the button
+      // could surface err.response?.data?.error in modal
     }
   }
 
-  // Update task plan (dropdown in detail modal)
-  async function handleChangePlan(newPlanNameOrEmpty) {
+  // ----- ACTIVE TASK / MODAL-DERIVED STATE -----
+
+  const activeTask = useMemo(() => {
+    if (!activeTaskId) return null;
+    return tasks.find((t) => t.Task_id === activeTaskId) || null;
+  }, [activeTaskId, tasks]);
+
+  // Sync origPlan / editedPlan whenever we open/switch task
+  useEffect(() => {
+    if (!activeTask) {
+      setOrigPlan("");
+      setEditedPlan("");
+      return;
+    }
+    const initialPlan = activeTask.Task_plan || "";
+    setOrigPlan(initialPlan);
+    setEditedPlan(initialPlan);
+  }, [activeTask]);
+
+  // can current user modify this task in its current state?
+  // (used for enabling Add Note, enabling plan dropdown in allowed states,
+  // and enabling state transition buttons at all)
+  const canModifyCurrentState = activeTask
+    ? canUserActOnTask(activeTask)
+    : false;
+
+  // ----- PLAN EDITING MODES -----
+  // "Open": plan can change immediately (PATCH on select)
+  // "ToDo" / "Doing": plan cannot change
+  // "Done": plan can change, but we ONLY persist it if user hits "Reject Task"
+  // "Closed": fully read-only
+  const planMode = useMemo(() => {
+    if (!activeTask) return "read-only";
+
+    if (activeTask.Task_state === "Open") {
+      return canModifyCurrentState ? "edit-apply-now" : "read-only";
+    }
+
+    if (activeTask.Task_state === "Done") {
+      return canModifyCurrentState ? "edit-stash-for-reject" : "read-only";
+    }
+
+    if (activeTask.Task_state === "Closed") {
+      return "read-only";
+    }
+
+    // ToDo / Doing (and any other states not listed) => read-only
+    return "read-only";
+  }, [activeTask, canModifyCurrentState]);
+
+  // ----- PLAN CHANGE HANDLERS -----
+
+  // For "Open" state: immediate PATCH when user changes plan.
+  async function handleImmediatePlanChange(newPlanNameOrEmpty) {
     if (!activeTaskId) return;
+    if (!activeTask) return;
+    // Only allow if planMode is "edit-apply-now"
+    if (planMode !== "edit-apply-now") return;
+    if (!canModifyCurrentState) return;
+
     try {
       const res = await api.patch(`/tasks/${activeTaskId}`, {
         Task_plan: newPlanNameOrEmpty, // "" or Plan_MVP_name
@@ -235,46 +296,123 @@ export default function TaskPage() {
         setTasks((prev) =>
           prev.map((t) => (t.Task_id === updated.Task_id ? updated : t))
         );
+        // origPlan/editedPlan will sync via useEffect(activeTask)
       }
     } catch (err) {
-      // optional: surface error
+      // could surface error
     }
   }
 
-  // Release Task (Open -> ToDo)
-  async function handleReleaseTask() {
-    if (!activeTaskId) return;
+  // For "Done" state: user can change dropdown locally
+  // We already have setEditedPlan from useState for that.
+
+  // ----- STATE ACTION BUTTONS -----
+
+  // Build the actions for the footer of the modal:
+  // depends on task.Task_state
+  // Done state has special "Approve Task"/"Reject Task" rules
+  const stateActions = useMemo(() => {
+    if (!activeTask) return [];
+
+    const baseDefs = STATE_TRANSITIONS[activeTask.Task_state] || [];
+    // We will decorate each with `disabled`
+
+    // helper to check if this specific action should be disabled
+    function isActionDisabled(action) {
+      // closed state => no actions anyway, but be safe
+      if (activeTask.Task_state === "Closed") return true;
+
+      // Must have permission on CURRENT state
+      if (!canModifyCurrentState) return true;
+
+      // Special rule in Done:
+      // "Approve Task" (Done -> Closed) is disabled if editedPlan !== origPlan
+      if (
+        activeTask.Task_state === "Done" &&
+        action.toState === "Closed"
+      ) {
+        if (editedPlan !== origPlan) return true;
+      }
+
+      return false;
+    }
+
+    return baseDefs.map((def) => ({
+      ...def,
+      disabled: isActionDisabled(def),
+    }));
+  }, [activeTask, canModifyCurrentState, editedPlan, origPlan]);
+
+  // ----- PATCH HELPERS FOR STATE TRANSITIONS -----
+
+  async function handleChangeTaskState(targetState) {
+    if (!activeTask || !activeTaskId) return;
+    if (!canModifyCurrentState) return;
+    if (activeTask.Task_state === "Closed") return; // locked
+
+    // We'll build the payload for PATCH based on current state & chosen target
+    const currState = activeTask.Task_state;
+    const payload = {};
+
+    if (currState === "Done") {
+      // Approve Task: Done -> Closed
+      // Reject Task:  Done -> Doing
+      if (targetState === "Closed") {
+        // Approve Task:
+        // Only allowed if editedPlan === origPlan (otherwise button disabled anyway)
+        payload.Task_state = "Closed";
+        // We do NOT send plan in Approve
+      } else if (targetState === "Doing") {
+        // Reject Task:
+        // Always move state Done -> Doing
+        payload.Task_state = "Doing";
+
+        // If user changed plan in Done state, include it here
+        if (editedPlan !== origPlan) {
+          payload.Task_plan = editedPlan;
+        }
+      } else {
+        // Unexpected transition from Done
+        return;
+      }
+    } else {
+      // All other states:
+      //   Open -> ToDo
+      //   ToDo -> Doing
+      //   Doing -> Done / ToDo
+      payload.Task_state = targetState;
+      // No plan changes happen here (plan change in Open is handled live via handleImmediatePlanChange)
+    }
+
     try {
-      const res = await api.patch(`/tasks/${activeTaskId}`, {
-        Task_state: RELEASE_TARGET_STATE,
-      });
+      const res = await api.patch(`/tasks/${activeTaskId}`, payload);
       const updated = res.data;
       if (updated) {
         setTasks((prev) =>
           prev.map((t) => (t.Task_id === updated.Task_id ? updated : t))
         );
-        // After successful release, we could keep modal open (to see notes, etc.)
+        // After PATCH, the task may have moved to a new state, but we're
+        // still looking at the same activeTaskId. The modal stays open.
+        // orig/editedPlan will resync via useEffect.
       }
     } catch (err) {
-      // optional: handle 403, etc.
+      // could surface error (403, etc.)
     }
   }
 
-  // Add Note
+  // ----- ADD NOTE -----
+
   async function handleAddNote(noteText) {
     if (!activeTaskId) return;
-    // PATCH expects Task_notes as a single note object with keys:
-    // { author, status, note } (backend will inject datetime)
-    // - author: username
-    // - status: current state of task
-    // - note: noteText
-    const currentTask = tasks.find((t) => t.Task_id === activeTaskId);
-    if (!currentTask) return;
+    if (!activeTask) return;
+    if (activeTask.Task_state === "Closed") return;
+    if (!canModifyCurrentState) return;
 
+    // PATCH expects Task_notes as { author, status, note }
     const payload = {
       Task_notes: {
-        author: username || "",
-        status: currentTask.Task_state,
+        author: user.username || "",
+        status: activeTask.Task_state,
         note: noteText,
       },
     };
@@ -288,147 +426,140 @@ export default function TaskPage() {
         );
       }
     } catch (err) {
-      // optional: show error
+      // could surface error
     }
   }
-
-  // Active task details (for modal)
-  const activeTask = useMemo(() => {
-    if (!activeTaskId) return null;
-    return tasks.find((t) => t.Task_id === activeTaskId) || null;
-  }, [activeTaskId, tasks]);
-
-  // derived permissions for the active task
-  const canModifyCurrentState = activeTask
-    ? canUserModifyCurrentTask(activeTask)
-    : false;
-  const canRelease = activeTask
-    ? canUserReleaseTask(activeTask)
-    : false;
 
   if (!ready) return null;
   if (!isAuthenticated) return null;
 
   return (
     <>
-    <HeaderPage />
-    <div className="p-6 mx-auto">
-      {/* Header row: "Kanban" + Add Plan */}
-      <div className="flex items-start justify-between mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Kanban</h1>
+      <HeaderPage />
+      <div className="p-6 mx-auto">
+        {/* Header row: "Kanban" + Add Plan */}
+        <div className="flex items-start justify-between mb-4">
+          <h1 className="text-xl font-semibold text-gray-800">Kanban</h1>
 
-        {isProjectManager ? (
-          <button
-            className="text-sm font-medium bg-indigo-600 text-white rounded px-3 py-2 hover:bg-indigo-700"
-            onClick={openCreatePlan}
+          {isProjectManager ? (
+            <button
+              className="text-sm font-medium bg-indigo-600 text-white rounded px-3 py-2 hover:bg-indigo-700"
+              onClick={openCreatePlan}
+            >
+              + Add Plan
+            </button>
+          ) : null}
+        </div>
+
+        {/* Board columns */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-start gap-4 lg:gap-0 lg:space-x-4">
+          {/* Open */}
+          <TaskColumn
+            title="Open"
+            onAddTask={openCreateTask}
+            showAddTaskButton={true}
           >
-            + Add Plan
-          </button>
+            {tasksByState.Open.map((t) => (
+              <TaskCard
+                key={t.Task_id}
+                task={t}
+                plan={planMap[t.Task_plan]}
+                onClick={() => openTaskModal(t.Task_id)}
+              />
+            ))}
+          </TaskColumn>
+
+          {/* To-Do */}
+          <TaskColumn title="To-Do">
+            {tasksByState.ToDo.map((t) => (
+              <TaskCard
+                key={t.Task_id}
+                task={t}
+                plan={planMap[t.Task_plan]}
+                onClick={() => openTaskModal(t.Task_id)}
+              />
+            ))}
+          </TaskColumn>
+
+          {/* Doing */}
+          <TaskColumn title="Doing">
+            {tasksByState.Doing.map((t) => (
+              <TaskCard
+                key={t.Task_id}
+                task={t}
+                plan={planMap[t.Task_plan]}
+                onClick={() => openTaskModal(t.Task_id)}
+              />
+            ))}
+          </TaskColumn>
+
+          {/* Done */}
+          <TaskColumn title="Done">
+            {tasksByState.Done.map((t) => (
+              <TaskCard
+                key={t.Task_id}
+                task={t}
+                plan={planMap[t.Task_plan]}
+                onClick={() => openTaskModal(t.Task_id)}
+              />
+            ))}
+          </TaskColumn>
+
+          {/* Closed */}
+          <TaskColumn title="Closed">
+            {tasksByState.Closed.map((t) => (
+              <TaskCard
+                key={t.Task_id}
+                task={t}
+                plan={planMap[t.Task_plan]}
+                onClick={() => openTaskModal(t.Task_id)}
+              />
+            ))}
+          </TaskColumn>
+        </div>
+
+        {/* Task detail modal */}
+        {activeTask ? (
+          <TaskDetailModal
+            task={activeTask}
+            plans={plans}
+            onClose={closeTaskModal}
+            // plan editing / selection
+            planMode={planMode} // "read-only" | "edit-apply-now" | "edit-stash-for-reject"
+            origPlan={origPlan}
+            editedPlan={editedPlan}
+            onImmediatePlanChange={handleImmediatePlanChange}
+            onSelectPlanLocal={setEditedPlan}
+            // state change buttons
+            stateActions={stateActions} // [{label,toState,disabled}, ...]
+            onChangeState={handleChangeTaskState}
+            // notes / perms
+            canModifyCurrentState={canModifyCurrentState}
+            onAddNote={handleAddNote}
+          />
+        ) : null}
+
+        {/* Create Task modal */}
+        {showCreateTask ? (
+          <CreateTaskModal
+            applications={applications}
+            plans={plans}
+            onClose={closeCreateTask}
+            onCreate={handleCreateTask}
+            canUserCreate={canUserCreateTaskForApp}
+          />
+        ) : null}
+
+        {/* Create Plan modal */}
+        {showCreatePlan ? (
+          <CreatePlanModal
+            applications={applications}
+            canCreatePlan={isProjectManager}
+            onClose={closeCreatePlan}
+            onCreate={handleCreatePlan}
+          />
         ) : null}
       </div>
-
-      {/* Board columns */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-start gap-4 lg:gap-0 lg:space-x-4">
-        {/* Open */}
-        <TaskColumn
-          title="Open"
-          onAddTask={openCreateTask}
-          showAddTaskButton={true}
-        >
-          {tasksByState.Open.map((t) => (
-            <TaskCard
-              key={t.Task_id}
-              task={t}
-              plan={planMap[t.Task_plan]}
-              onClick={() => openTaskModal(t.Task_id)}
-            />
-          ))}
-        </TaskColumn>
-
-        {/* To-Do */}
-        <TaskColumn title="To-Do">
-          {tasksByState.ToDo.map((t) => (
-            <TaskCard
-              key={t.Task_id}
-              task={t}
-              plan={planMap[t.Task_plan]}
-              onClick={() => openTaskModal(t.Task_id)}
-            />
-          ))}
-        </TaskColumn>
-
-        {/* Doing */}
-        <TaskColumn title="Doing">
-          {tasksByState.Doing.map((t) => (
-            <TaskCard
-              key={t.Task_id}
-              task={t}
-              plan={planMap[t.Task_plan]}
-              onClick={() => openTaskModal(t.Task_id)}
-            />
-          ))}
-        </TaskColumn>
-
-        {/* Done */}
-        <TaskColumn title="Done">
-          {tasksByState.Done.map((t) => (
-            <TaskCard
-              key={t.Task_id}
-              task={t}
-              plan={planMap[t.Task_plan]}
-              onClick={() => openTaskModal(t.Task_id)}
-            />
-          ))}
-        </TaskColumn>
-
-        {/* Closed */}
-        <TaskColumn title="Closed">
-          {tasksByState.Closed.map((t) => (
-            <TaskCard
-              key={t.Task_id}
-              task={t}
-              plan={planMap[t.Task_plan]}
-              onClick={() => openTaskModal(t.Task_id)}
-            />
-          ))}
-        </TaskColumn>
-      </div>
-
-      {/* Task detail modal */}
-      {activeTask ? (
-        <TaskDetailModal
-          task={activeTask}
-          plans={plans}
-          onClose={closeTaskModal}
-          onChangePlan={handleChangePlan}
-          onReleaseTask={handleReleaseTask}
-          onAddNote={handleAddNote}
-          canModifyCurrentState={canModifyCurrentState}
-          canRelease={canRelease}
-        />
-      ) : null}
-
-      {/* Create Task modal */}
-      {showCreateTask ? (
-        <CreateTaskModal
-          applications={applications}
-          plans={plans}
-          onClose={closeCreateTask}
-          onCreate={handleCreateTask}
-          canUserCreate={canUserCreateTaskForApp}
-        />
-      ) : null}
-
-      {/* Create Plan modal */}
-      {showCreatePlan ? (
-        <CreatePlanModal
-          applications={applications}
-          canCreatePlan={isProjectManager}
-          onClose={closeCreatePlan}
-          onCreate={handleCreatePlan}
-        />
-      ) : null}
-    </div>
     </>
   );
 }
