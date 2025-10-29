@@ -78,24 +78,21 @@ INSERT INTO userGroups (name) VALUES
 INSERT INTO accounts (username, email, password, active, userGroups) VALUES
   ('admin', 'admin@example.com', '$2b$10$l3yNCDOT0h70PD9TRhDKLepx6kR5q7BLQTT/4w8dmnz8zKBFgQsJm', 1, '["admin"]'),
   ('figurehead', 'fig@fig.com', '$2b$12$19OLvcSNPJU9sWnJWrr/Lu2rkPXnFNFREzgXlAz177uUhYr1ZfOIy', 1, '["admin", "project lead", "project manager", "dev team"]'),
+  ('lead',  'lead@example.com',  '$2b$12$67OJxYTF9j6DQlarc77./e3C4ooOAOVb3zzZyvqlNE/czaGfbsvJW', 1, '["project lead"]'),
   ('pm',    'pm@example.com',    '$2b$10$mGy56GwtDPtNCH6//jgA8.y2Uv/w/.CNZAhFjiWVaEiItHjXSPoUm',    1, '["project manager"]'),
   ('user',  'user@example.com',  '$2b$10$JVZimuEKi1ShfrK/n.xFz.iZYEZxT/K6YQtvGJ5wjxCn5IU8Ss49u',  1, '["dev team"]'),
-  ('inactive', 'null@null.com', '$2b$12$JC407angGDbdviFYAgefXed8evLSrx5zMbInSyunzALggKjLUa0Ei', 0, '["dev team"]');
+  ('inactive', 'null@null.com', '$2b$12$JC407angGDbdviFYAgefXed8evLSrx5zMbInSyunzALggKjLUa0Ei', 0, '[]');
 
 -- Seed applications
 INSERT INTO applications (App_Acronym, App_Description, App_Rnumber, App_startDate, App_endDate, App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done) VALUES
   ('Project A', 'first app yay', 0, '2022-01-01', '2022-01-31', '["project lead"]', '["project manager"]', '["project manager", "dev team"]', '["dev team"]', '["project lead"]'),
-  ('pipedream', 'someones pipedream', 1, '2022-02-01', '2022-02-28', '["project lead"]', '["project manager"]', '["project manager", "dev team"]', '["dev team"]', '["project lead"]');
+  ('pipedream', 'someones pipedream', 1, '2022-02-01', '2022-02-28', '["project lead"]', '["project manager"]', '["dev team"]', '["dev team"]', '["project lead"]');
 
 -- Seed plans
 INSERT INTO plans (Plan_MVP_name, Plan_startDate, Plan_endDate, Plan_app_acronym) VALUES
   ('do init', '2022-01-01', '2022-01-14', 'Project A'),
-  ('start frontend', '2022-01-15', '2022-02-21', 'Project A'),
-  ('start backend', '2022-02-22', '2022-03-28', 'Project A'),
-  ('init pipedream', '2022-03-29', '2022-04-05', 'pipedream');
+  ('Sprint 0', '2022-03-29', '2022-04-05', 'pipedream');
 
 -- Seed tasks
--- INSERT INTO tasks (Task_name, Task_description, Task_notes, Task_id, Task_plan, Task_app_acronym, Task_state, Task_creator, Task_owner, Task_createDate) VALUES
---   ('init', 'init', '{}', '0', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
---   ('init', 'init', '{}', '1', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01'),
---   ('init', 'init', '{}', '2', 'do init', 'Project A', 'Open', 'pm', 'pm', '2022-01-01');
+INSERT INTO tasks (Task_name, Task_description, Task_notes, Task_id, Task_plan, Task_app_acronym, Task_state, Task_creator, Task_owner, Task_createDate) VALUES
+  ('setup infra',	'set up npm packages, docker, kubernetes etc', '[]',	'pipedream_1', 'Sprint 0', 'pipedream',	'Open',	'figurehead',	'figurehead',	'2025-10-29');
