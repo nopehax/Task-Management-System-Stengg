@@ -60,7 +60,6 @@ export default function TaskDetailModal({
   planMode,
   origPlan,
   editedPlan,
-  onImmediatePlanChange,
   onSelectPlanLocal,
   stateActions,
   onChangeState,
@@ -86,16 +85,13 @@ export default function TaskDetailModal({
     planMode === "read-only" || isClosed || !canModifyCurrentState;
 
   const planSelectValue =
-    planMode === "edit-stash-for-reject"
+    planMode === "edit-stash"
       ? editedPlan || ""
       : task.Task_plan || "";
 
   function handlePlanSelect(e) {
     const newVal = e.target.value; // "" or Plan_MVP_name
-    if (planMode === "edit-apply-now") {
-      // Open state: apply immediately
-      onImmediatePlanChange(newVal);
-    } else if (planMode === "edit-stash-for-reject") {
+    if (planMode === "edit-stash") {
       // Done state: just stage locally
       onSelectPlanLocal(newVal);
     }

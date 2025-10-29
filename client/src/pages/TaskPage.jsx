@@ -261,19 +261,15 @@ export default function TaskPage() {
     : false;
 
   // ----- PLAN EDITING MODES -----
-  // "Open": plan can change immediately (PATCH on select)
+  // "Open": plan can change
   // "ToDo" / "Doing": plan cannot change
   // "Done": plan can change, but we ONLY persist it if user hits "Reject Task"
   // "Closed": fully read-only
   const planMode = useMemo(() => {
     if (!activeTask) return "read-only";
 
-    if (activeTask.Task_state === "Open") {
-      return canModifyCurrentState ? "edit-apply-now" : "read-only";
-    }
-
-    if (activeTask.Task_state === "Done") {
-      return canModifyCurrentState ? "edit-stash-for-reject" : "read-only";
+    if (activeTask.Task_state === "Open" || activeTask.Task_state === "Done") {
+      return canModifyCurrentState ? "edit-stash" : "read-only";
     }
 
     if (activeTask.Task_state === "Closed") {
@@ -284,31 +280,6 @@ export default function TaskPage() {
     return "read-only";
   }, [activeTask, canModifyCurrentState]);
 
-  // ----- PLAN CHANGE HANDLERS -----
-
-  // For "Open" state: immediate PATCH when user changes plan.
-  async function handleImmediatePlanChange(newPlanNameOrEmpty) {
-    if (!activeTaskId) return;
-    if (!activeTask) return;
-    // Only allow if planMode is "edit-apply-now"
-    if (planMode !== "edit-apply-now") return;
-    if (!canModifyCurrentState) return;
-
-    try {
-      const res = await api.patch(`/tasks/${activeTaskId}`, {
-        Task_plan: newPlanNameOrEmpty, // "" or Plan_MVP_name
-      });
-      const updated = res.data;
-      if (updated) {
-        setTasks((prev) =>
-          prev.map((t) => (t.Task_id === updated.Task_id ? updated : t))
-        );
-        // origPlan/editedPlan will sync via useEffect(activeTask)
-      }
-    } catch (err) {
-      // could surface error
-    }
-  }
 
   // For "Done" state: user can change dropdown locally
   // We already have setEditedPlan from useState for that.
@@ -389,6 +360,10 @@ export default function TaskPage() {
       //   Doing -> Done / ToDo
       payload.Task_state = targetState;
       // No plan changes happen here (plan change in Open is handled live via handleImmediatePlanChange)
+    }
+
+    if (payload.Task_state === "ToDo") {
+        payload.Task_plan = editedPlan;
     }
 
     try {
@@ -537,7 +512,6 @@ export default function TaskPage() {
             planMode={planMode} // "read-only" | "edit-apply-now" | "edit-stash-for-reject"
             origPlan={origPlan}
             editedPlan={editedPlan}
-            onImmediatePlanChange={handleImmediatePlanChange}
             onSelectPlanLocal={setEditedPlan}
             // state change buttons
             stateActions={stateActions} // [{label,toState,disabled}, ...]
