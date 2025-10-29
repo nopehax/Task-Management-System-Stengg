@@ -22,7 +22,7 @@ const LoginPage = () => {
       if (isOnlyAdmin(user)) {
         navigate("/usermanage", { replace: true });
       } else {
-        const from = location.state?.from || "/applications";
+        const from = location.state?.from || "/tasks";
         navigate(from, { replace: true });
       }
     }

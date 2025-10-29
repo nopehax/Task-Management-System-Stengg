@@ -28,9 +28,14 @@ export default function HeaderPage() {
     };
   }, [open]);
 
-  const handleHome = () => {
+  const handleApplications = () => {
     setOpen(false);
-    navigate("/");
+    navigate("/applications");
+  }
+
+  const handleKanban = () => {
+    setOpen(false);
+    navigate("/tasks");
   }
 
   const handleLogout = async () => {
@@ -89,12 +94,22 @@ export default function HeaderPage() {
             >
               <button
                 type="button"
-                onClick={handleHome}
+                onClick={handleKanban}
                 className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 role="menuitem"
               >
-                Applications
+                Kanban Board
               </button>
+              {user?.userGroups?.includes("project lead") && (
+                <button
+                  type="button"
+                  onClick={handleApplications}
+                  className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  role="menuitem"
+                >
+                  App Management
+                </button>
+              )}
               {user?.userGroups?.includes("admin") && (
                 <button
                   type="button"
