@@ -438,7 +438,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
             error: "A plan is required to move to release task",
           });
         }
-        if (taskCurrState !== "Open" && taskCurrState !== "Doing") {
+        if (!(taskCurrState === "Open" || taskCurrState === "Doing")) {
           console.log("taskCurrState", taskCurrState)
           await conn.rollback();
           return res.status(400).json({
@@ -447,7 +447,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
         }
       }
       if (Task_state === "Doing") {
-        if (taskCurrState !== "ToDo" && taskCurrState !== "Done") {
+        if (!(taskCurrState === "ToDo" || taskCurrState == "Done")) {
           await conn.rollback();
           return res.status(400).json({
             error: "Cannot move task from " + taskCurrState + " to Doing",
