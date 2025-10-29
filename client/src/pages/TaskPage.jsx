@@ -17,7 +17,6 @@ const api = axios.create({
 });
 
 // Map current task state -> which application permit field controls actions/edits
-// Closed is fully locked, so we won't even consult permits for Closed.
 const PERMIT_FIELD_BY_STATE = {
   Open: "App_permit_Open",
   ToDo: "App_permit_ToDo",
@@ -27,7 +26,6 @@ const PERMIT_FIELD_BY_STATE = {
 };
 
 // State transition definitions based on CURRENT state
-// Each entry is an array of { label, toState }
 const STATE_TRANSITIONS = {
   Open: [{ label: "Release Task", toState: "ToDo" }],
   ToDo: [{ label: "Pick Up Task", toState: "Doing" }],
@@ -56,8 +54,7 @@ export default function TaskPage() {
   const [showCreatePlan, setShowCreatePlan] = useState(false);
 
   // For the active task modal's plan editing behavior:
-  // - origPlan: Task_plan value when modal opened
-  // - editedPlan: user's currently selected plan in the modal (may differ in Done state)
+  // mainly for Done state (can't change plan if gonna approve)
   const [origPlan, setOrigPlan] = useState("");
   const [editedPlan, setEditedPlan] = useState("");
 
@@ -153,13 +150,10 @@ export default function TaskPage() {
   }
 
   // can the current user act on a task in its *current* state?
-  // This governs:
-  // - state transition buttons
-  // - Add Note
-  // - plan editing (where allowed)
+  // i.e. action buttons, add note
   function canUserActOnTask(task) {
     if (!task) return false;
-    if (task.Task_state === "Closed") return false; // Closed is hard-locked
+    if (task.Task_state === "Closed") return false;
     const app = appMap[task.Task_app_acronym];
     if (!app || !hasAnyGroup) return false;
     const field = PERMIT_FIELD_BY_STATE[task.Task_state];
@@ -254,8 +248,6 @@ export default function TaskPage() {
   }, [activeTask]);
 
   // can current user modify this task in its current state?
-  // (used for enabling Add Note, enabling plan dropdown in allowed states,
-  // and enabling state transition buttons at all)
   const canModifyCurrentState = activeTask
     ? canUserActOnTask(activeTask)
     : false;
@@ -263,7 +255,7 @@ export default function TaskPage() {
   // ----- PLAN EDITING MODES -----
   // "Open": plan can change
   // "ToDo" / "Doing": plan cannot change
-  // "Done": plan can change, but we ONLY persist it if user hits "Reject Task"
+  // "Done": plan can change
   // "Closed": fully read-only
   const planMode = useMemo(() => {
     if (!activeTask) return "read-only";
@@ -276,24 +268,16 @@ export default function TaskPage() {
       return "read-only";
     }
 
-    // ToDo / Doing (and any other states not listed) => read-only
     return "read-only";
   }, [activeTask, canModifyCurrentState]);
 
-
-  // For "Done" state: user can change dropdown locally
-  // We already have setEditedPlan from useState for that.
-
   // ----- STATE ACTION BUTTONS -----
 
-  // Build the actions for the footer of the modal:
-  // depends on task.Task_state
-  // Done state has special "Approve Task"/"Reject Task" rules
+  // Build the action button(s) for task detail modal, depending on task.Task_state
   const stateActions = useMemo(() => {
     if (!activeTask) return [];
 
     const baseDefs = STATE_TRANSITIONS[activeTask.Task_state] || [];
-    // We will decorate each with `disabled`
 
     // helper to check if this specific action should be disabled
     function isActionDisabled(action) {
@@ -326,9 +310,9 @@ export default function TaskPage() {
   async function handleChangeTaskState(targetState) {
     if (!activeTask || !activeTaskId) return;
     if (!canModifyCurrentState) return;
-    if (activeTask.Task_state === "Closed") return; // locked
+    if (activeTask.Task_state === "Closed") return;
 
-    // We'll build the payload for PATCH based on current state & chosen target
+    // build payload
     const currState = activeTask.Task_state;
     const payload = {};
 
@@ -336,12 +320,9 @@ export default function TaskPage() {
       // Approve Task: Done -> Closed
       // Reject Task:  Done -> Doing
       if (targetState === "Closed") {
-        // Approve Task:
         // Only allowed if editedPlan === origPlan (otherwise button disabled anyway)
         payload.Task_state = "Closed";
-        // We do NOT send plan in Approve
       } else if (targetState === "Doing") {
-        // Reject Task:
         // Always move state Done -> Doing
         payload.Task_state = "Doing";
 
@@ -350,7 +331,6 @@ export default function TaskPage() {
           payload.Task_plan = editedPlan;
         }
       } else {
-        // Unexpected transition from Done
         return;
       }
     } else {
@@ -359,7 +339,6 @@ export default function TaskPage() {
       //   ToDo -> Doing
       //   Doing -> Done / ToDo
       payload.Task_state = targetState;
-      // No plan changes happen here (plan change in Open is handled live via handleImmediatePlanChange)
     }
 
     if (payload.Task_state === "ToDo") {
@@ -373,8 +352,7 @@ export default function TaskPage() {
         setTasks((prev) =>
           prev.map((t) => (t.Task_id === updated.Task_id ? updated : t))
         );
-        // After PATCH, the task may have moved to a new state, but we're
-        // still looking at the same activeTaskId. The modal stays open.
+        // After PATCH, the task may have moved to a new state, but keep modal open.
         // orig/editedPlan will resync via useEffect.
       }
     } catch (err) {
@@ -509,14 +487,13 @@ export default function TaskPage() {
             plans={plans}
             onClose={closeTaskModal}
             // plan editing / selection
-            planMode={planMode} // "read-only" | "edit-apply-now" | "edit-stash-for-reject"
+            planMode={planMode}
             origPlan={origPlan}
             editedPlan={editedPlan}
             onSelectPlanLocal={setEditedPlan}
             // state change buttons
             stateActions={stateActions} // [{label,toState,disabled}, ...]
             onChangeState={handleChangeTaskState}
-            // notes / perms
             canModifyCurrentState={canModifyCurrentState}
             onAddNote={handleAddNote}
             error={taskModalError}

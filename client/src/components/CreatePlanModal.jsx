@@ -6,10 +6,9 @@ import React, { useState } from "react";
  *
  * Props:
  * - applications: array of application objects [{App_Acronym, ...}]
- * - canCreatePlan: boolean (user is "project manager")
+ * - canCreatePlan: boolean (is user "project manager")
  * - onClose()
  * - onCreate({ Plan_MVP_name, Plan_app_acronym, Plan_startDate, Plan_endDate })
- *      all yyyy-MM-dd
  */
 export default function CreatePlanModal({
   applications,
@@ -36,8 +35,8 @@ export default function CreatePlanModal({
     onCreate({
       Plan_MVP_name,
       Plan_app_acronym,
-      Plan_startDate, // yyyy-MM-dd (from <input type="date" />)
-      Plan_endDate,   // yyyy-MM-dd
+      Plan_startDate,
+      Plan_endDate,
     });
   }
 

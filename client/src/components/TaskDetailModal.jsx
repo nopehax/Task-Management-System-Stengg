@@ -25,15 +25,8 @@ import { formatDisplayDate, formatPlanRange } from "../utils/date";
  *
  * - onClose(): close modal
  *
- * - planMode:
- *   "read-only"
- *   "edit-apply-now"           // state=Open: PATCH immediately on change
- *   "edit-stash-for-reject"    // state=Done: stage locally, only send on Reject
- *
  * - origPlan: string (task.Task_plan when modal opened)
  * - editedPlan: string (current dropdown selection in the modal UI)
- * - onImmediatePlanChange(newPlanNameOrEmpty): PATCH immediately (Open only)
- * - onSelectPlanLocal(newPlanNameOrEmpty): update editedPlan in parent (Done only)
  *
  * - stateActions: array of { label, toState, disabled }
  *   e.g. [{ label:"Release Task", toState:"ToDo", disabled:false }]
@@ -44,7 +37,6 @@ import { formatDisplayDate, formatPlanRange } from "../utils/date";
  *   For "Closed": []
  *
  * - onChangeState(targetState): called when clicking any state action button.
- *   Special cases are handled in TaskPage (Done->Doing also applies staged plan if changed)
  *
  * - canModifyCurrentState: boolean
  *   Controls:
@@ -76,11 +68,6 @@ export default function TaskDetailModal({
   const isClosed = task.Task_state === "Closed";
 
   // --- Plan dropdown handling ---
-  // The dropdown is:
-  // - disabled completely in read-only mode OR Closed OR when user lacks permission
-  // - in "edit-apply-now": value = task.Task_plan; onChange -> PATCH immediately
-  // - in "edit-stash-for-reject": value = editedPlan; onChange -> just stage locally
-  //
   const planDropdownDisabled =
     planMode === "read-only" || isClosed || !canModifyCurrentState;
 
@@ -90,9 +77,8 @@ export default function TaskDetailModal({
       : task.Task_plan || "";
 
   function handlePlanSelect(e) {
-    const newVal = e.target.value; // "" or Plan_MVP_name
+    const newVal = e.target.value;
     if (planMode === "edit-stash") {
-      // Done state: just stage locally
       onSelectPlanLocal(newVal);
     }
     // read-only mode won't trigger because dropdown is disabled

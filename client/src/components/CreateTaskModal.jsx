@@ -6,9 +6,8 @@ import { formatPlanRange } from "../utils/date";
  * CreateTaskModal
  *
  * Props:
- * - applications: array of application objects from /api/applications
- *   (must include App_Acronym and App_permit_Create at least)
- * - plans: array of plan objects from /api/plans
+ * - applications: array of applications (must include App_Acronym and App_permit_Create at least)
+ * - plans: array of plan
  * - onClose(): close modal
  * - onCreate(formData): attempt to create task
  *      formData = {
@@ -32,8 +31,7 @@ export default function CreateTaskModal({
   const [Task_description, setTaskDesc] = useState("");
   const [Task_plan, setTaskPlan] = useState("");
 
-  // We can optionally filter plan dropdown by chosen app,
-  // so you only see plans for that application.
+  // filter plan dropdown by chosen app,
   const filteredPlans = useMemo(() => {
     if (!Task_app_acronym) return [];
     return plans.filter(
@@ -58,7 +56,7 @@ export default function CreateTaskModal({
       Task_app_acronym,
       Task_name,
       Task_description,
-      Task_plan, // "" or plan name
+      Task_plan,
     });
   }
 
