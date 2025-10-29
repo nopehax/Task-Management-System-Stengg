@@ -429,6 +429,47 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
         await conn.rollback();
         return res.status(400).json({ error: "Invalid Task_state" });
       }
+
+      // check that target state is allowed from current state
+      if (Task_state === "ToDo") {
+        if (!Task_plan) {
+          await conn.rollback();
+          return res.status(400).json({
+            error: "A plan is required to move to release task",
+          });
+        }
+        if (taskCurrState !== "Open" && taskCurrState !== "Doing") {
+          console.log("taskCurrState", taskCurrState)
+          await conn.rollback();
+          return res.status(400).json({
+            error: "Cannot move task from " + taskCurrState + " to ToDo",
+          });
+        }
+      }
+      if (Task_state === "Doing") {
+        if (taskCurrState !== "ToDo" && taskCurrState !== "Done") {
+          await conn.rollback();
+          return res.status(400).json({
+            error: "Cannot move task from " + taskCurrState + " to Doing",
+          });
+        }
+      }
+      if (Task_state === "Done") {
+        if (taskCurrState !== "Doing") {
+          await conn.rollback();
+          return res.status(400).json({
+            error: "Cannot move task from " + taskCurrState + " to Done",
+          });
+        }
+      }
+      if (Task_state === "Closed") {
+        if (taskCurrState !== "Done") {
+          await conn.rollback();
+          return res.status(400).json({
+            error: "Cannot move task from " + taskCurrState + " to Closed",
+          });
+        }
+      }
       
       const stateChangeNote = {
         author: taskOwner,
