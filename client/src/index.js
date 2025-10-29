@@ -10,6 +10,7 @@ import ProtectedRoute from './utils/protectedRoute';
 import UserManagementPage from './pages/UserManagementPage';
 import NotAuthorizedPage from './pages/NotAuthorizedPage';
 import UserProfilePage from './pages/UserProfilePage';
+import TaskPage from './pages/TaskPage';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -24,6 +25,7 @@ root.render(
           <Route element={<ProtectedRoute />}>
             <Route path="/applications" element={<ApplicationPage />} />
             <Route path="/user/:username" element={<UserProfilePage />} />
+            <Route path="/tasks" element={<TaskPage />} />
           </Route>
 
           <Route element={<ProtectedRoute allow={['admin']} />}>

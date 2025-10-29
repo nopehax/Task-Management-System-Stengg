@@ -3,15 +3,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactDOM from "react-dom";
 
 export default function ChipsMultiSelect({
-  options = [],          // array of strings
-  value = [],            // array of strings
-  onChange,              // (arr) => void
+  options = [],
+  value = [],
+  onChange,
   placeholder = "Select groups…",
   disabled = false,
   errorText = "",
   maxMenuHeight = 240,   // desired max list height (will clamp to viewport)
   id = "chips-multiselect",
-  disabledOptions = [],  // array of strings
+  disabledOptions = [],
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);    // wraps the trigger
