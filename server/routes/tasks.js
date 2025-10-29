@@ -29,9 +29,10 @@ function normalizeTaskRow(row) {
     Task_name: row.Task_name,
     Task_description: row.Task_description,
     Task_notes: parsedNotes,
-    Task_plan: row.Task_plan,
+    Task_plan: row.Task_plan || "",
     Task_app_acronym: row.Task_app_acronym,
     Task_state: row.Task_state,
+    Task_owner: row.Task_owner,
     Task_creator: row.Task_creator,
     Task_createDate: row.Task_createDate || "",
   };
@@ -158,7 +159,6 @@ router.post("/tasks", authRequired, async (req, res) => {
   }
 
   if (
-    !Task_plan ||
     typeof Task_plan !== "string" ||
     Task_plan.length > 50
   ) {
@@ -232,7 +232,7 @@ router.post("/tasks", authRequired, async (req, res) => {
         LIMIT 1`,
       [Task_plan.trim()]
     );
-    if (!planRows.length) {
+    if (Task_plan && !planRows.length) {
       await conn.rollback();
       return res.status(400).json({
         error: "Referenced plan does not exist",
@@ -267,7 +267,7 @@ router.post("/tasks", authRequired, async (req, res) => {
       Task_description.trim(),
       JSON.stringify([]),
       newTaskId,
-      Task_plan.trim(),
+      Task_plan.trim() || null,
       Task_app_acronym.trim(),
       Task_state,
       Task_creator.trim(),

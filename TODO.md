@@ -1,13 +1,13 @@
 # TODO
 
+- Task_owner should be whoever picks up the task. ['Open', 'ToDo'] unassigned, ['Doing', 'Done', 'Closed'] cannot be null.
+- send email (using nodemailer and ethereal mail) to project lead when task change from 'doing' to 'done'.
+- UI colours match with figma
+
 
 ## Changes made
 
-- when logging out then log back in, the user will be redirected to where the prev user logged out from
-- empty input when login also invalid message
-- change login look
-- password invalid error message need say use special char etc...
-- home button change to applications page button
-- in add new user, if missing field set error message, instead of disable "add user" button
-- add new user check string length <50
-- error message should have timeout 5s
+- fix issue now checks current state to see if can switch to target state.
+- fix issue now display error messages
+- remove handleImmediatePlanChange
+- fix issue now allow no plan when creating tasks
