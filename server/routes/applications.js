@@ -98,7 +98,7 @@ router.post("/applications", authRequired, requireGroup(["project lead"]), async
       }
 
       // Description validation
-      if (typeof App_Description !== "string" || (!App_Description.trim().length > 255)) {
+      if (typeof App_Description !== "string" || (App_Description.trim().length > 255)) {
         return res.status(400).json({ error: "Invalid Description (max 255 chars)" });
       }
 
@@ -196,13 +196,18 @@ router.post("/applications", authRequired, requireGroup(["project lead"]), async
 */
 router.patch("/applications/:acronym", authRequired, requireGroup(["project lead"]), async (req, res) => {
     const { acronym } = req.params;
+    let conn;
     try {
+      conn = await pool.getConnection();
+      await conn.beginTransaction();
+
       // first check record exists
-      const [rows] = await pool.query(
+      const [rows] = await conn.query(
         `SELECT App_Acronym FROM applications WHERE App_Acronym = ?`,
         [acronym]
       );
       if (!rows.length) {
+        await conn.rollback();
         return res.status(404).json({ error: "Application not found" });
       }
 
@@ -216,19 +221,23 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
         App_permit_Doing,
         App_permit_Done,
       } = req.body || {};
-      
-      // fields can be empty on update
-      if (typeof App_Description !== "string" || (!App_Description.trim().length > 255)) {
-        return res.status(400).json({ error: "Invalid Description (max 255 chars)" });
+
+      // fields can be empty on update (your current rule)
+      if (typeof App_Description !== "string" || App_Description.trim().length > 255) {
+        await conn.rollback();
+        return res
+          .status(400)
+          .json({ error: "Invalid Description (max 255 chars)" });
       }
-      
+
       if (App_startDate && App_endDate) {
         const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
         const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
         const startObj = new Date(sy, sm - 1, sd);
         const endObj = new Date(ey, em - 1, ed);
-        
+
         if (startObj > endObj) {
+          await conn.rollback();
           return res.status(400).json({
             error: "Start Date must be before or equal to End Date",
           });
@@ -242,15 +251,15 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
         ensureArrayOfStrings(App_permit_Doing) &&
         ensureArrayOfStrings(App_permit_Done);
 
-        if (!groupsOk) {
-          return res.status(400).json({
-            error:
-            "All permit fields must be arrays",
-          });
-        }
+      if (!groupsOk) {
+        await conn.rollback();
+        return res.status(400).json({
+          error: "All permit fields must be arrays",
+        });
+      }
 
       // update
-      await pool.query(
+      await conn.query(
         `
         UPDATE applications
            SET App_Description = ?,
@@ -277,7 +286,7 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
       );
 
       // read it back
-      const [rows2] = await pool.query(
+      const [rows2] = await conn.query(
         `SELECT App_Acronym, App_Description, App_Rnumber,
                 App_startDate, App_endDate,
                 App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
@@ -287,18 +296,31 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
       );
 
       if (!rows2.length) {
+        await conn.rollback();
         return res
           .status(500)
           .json({ error: "Failed to read updated record" });
       }
 
+      await conn.commit();
+
       const record = normalizeRow(rows2[0]);
       return res.json(record);
     } catch (err) {
+      if (conn) {
+        try {
+          await conn.rollback();
+        } catch (e) {
+          // ignore rollback error
+        }
+      }
       console.error("PATCH /api/applications/:acronym error:", err);
       return res.status(500).json({ error: "Failed to update application" });
+    } finally {
+      if (conn) conn.release();
     }
   }
 );
+
 
 module.exports = router;
