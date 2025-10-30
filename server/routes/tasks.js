@@ -476,7 +476,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       const stateChangeNote = {
         author: req.auth.username,
         status: taskCurrState,
-        datetime: new Date().toISOString(),
+        datetime: new Date().toLocaleString(),
         message: `Task state changed from "${taskCurrState}" to "${Task_state}"`,
       }
       const currNote = await getCurrNote(taskId, conn)
@@ -498,7 +498,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       }
       const withDatetime = {
         ...Task_notes,
-        datetime: new Date().toISOString(),
+        datetime: new Date().toLocaleString(),
       }
       const currNote = await getCurrNote(taskId, conn)
       const newNote = [...currNote, withDatetime]
