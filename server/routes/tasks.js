@@ -149,7 +149,6 @@ router.post("/tasks", authRequired, async (req, res) => {
   }
 
   if (
-    !Task_description ||
     typeof Task_description !== "string" ||
     Task_description.length > 255
   ) {

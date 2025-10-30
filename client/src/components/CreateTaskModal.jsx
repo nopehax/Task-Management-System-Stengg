@@ -41,8 +41,7 @@ export default function CreateTaskModal({
 
   const isValidBasic =
     Task_app_acronym.trim() &&
-    Task_name.trim() &&
-    Task_description.trim();
+    (Task_name.trim().length <= 50);
 
   const isAuthorized = Task_app_acronym
     ? canUserCreate(Task_app_acronym)
