@@ -388,7 +388,6 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
     // Task_plan (optional but must exist)
     if (typeof Task_plan !== "undefined") {
       if (
-        !Task_plan ||
         typeof Task_plan !== "string" ||
         Task_plan.length > 50
       ) {
@@ -399,22 +398,24 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       }
 
       // check plan exists
-      const [planRows] = await conn.query(
-        `SELECT 1
-           FROM plans
-          WHERE Plan_MVP_name = ?
-          LIMIT 1`,
-        [Task_plan.trim()]
-      );
-      if (!planRows.length) {
-        await conn.rollback();
-        return res.status(400).json({
-          error: "Referenced plan does not exist",
-        });
+      if (Task_plan.trim() !== "") {
+        const [planRows] = await conn.query(
+          `SELECT 1
+             FROM plans
+            WHERE Plan_MVP_name = ?
+            LIMIT 1`,
+          [Task_plan.trim()]
+        );
+        if (!planRows.length) {
+          await conn.rollback();
+          return res.status(400).json({
+            error: "Referenced plan does not exist",
+          });
+        }
       }
 
       updates.push("Task_plan = ?");
-      params.push(Task_plan.trim());
+      params.push(Task_plan.trim() ? Task_plan.trim() : null);
     }
 
     // Task_owner (if base on last touch)
@@ -431,12 +432,6 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
 
       // check that target state is allowed from current state
       if (Task_state === "ToDo") {
-        if (!Task_plan) {
-          await conn.rollback();
-          return res.status(400).json({
-            error: "A plan is required to move to release task",
-          });
-        }
         if (!(taskCurrState === "Open" || taskCurrState === "Doing")) {
           console.log("taskCurrState", taskCurrState)
           await conn.rollback();
