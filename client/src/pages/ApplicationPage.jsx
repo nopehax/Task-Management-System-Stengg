@@ -11,15 +11,6 @@ const api = axios.create({
   headers: { Accept: "application/json" },
 });
 
-// Utilities
-const isIsoDateString = (s) => {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-
-const cmpAcronym = (a, b) => {
-  return a.App_Acronym.localeCompare(b.App_Acronym);
-}
-
 const Chips = ({ items }) => {
   if (!Array.isArray(items) || items.length === 0) return null;
   return (
@@ -42,8 +33,12 @@ const ApplicationPage = () => {
 
   const [apps, setApps] = useState([]);
   const [groups, setGroups] = useState([]);
+  
+  // per-row error for updates
+  const [postError, setPostError] = useState("");
+  const [rowErrors, setRowErrors] = useState({});
 
-  // Create-row state (visible only to project lead)
+  // Create-row state
   const [acronym, setAcronym] = useState("");
   const [desc, setDesc] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -53,7 +48,6 @@ const ApplicationPage = () => {
   const [permitToDo, setPermitToDo] = useState([]);
   const [permitDoing, setPermitDoing] = useState([]);
   const [permitDone, setPermitDone] = useState([]);
-  const [postError, setPostError] = useState("");
 
   useEffect(() => {
     if (!ready || !isAuthenticated) return;
@@ -64,7 +58,6 @@ const ApplicationPage = () => {
           api.get("/applications"),
           api.get("/usergroups"),
         ]);
-
         if (!mounted) return;
         console.log(appsRes);
         console.log(groupsRes)
@@ -95,30 +88,24 @@ const ApplicationPage = () => {
   }, [ready, isAuthenticated]);
 
   const sortedApps = useMemo(() => {
-    return [...apps].sort(cmpAcronym);
+    return [...apps].sort((a, b) =>
+      (a.App_Acronym).localeCompare(b.App_Acronym)
+    );
   }, [apps]);
 
-  // Validate and POST create
-  async function handleCreate(e) {
-    e.preventDefault();
+  // POST create
+  async function handleCreate() {
     setPostError("");
 
-    // Client-side validation
     if (!acronym || acronym.length > 50) {
-      setPostError("Acronym is required (max 50 chars).");
+      setPostError("Invalid Acronym (max 50 chars).");
       return;
     }
-    if (!desc.trim()) {
-      setPostError("Description is required.");
+    if (!desc.trim() && desc.trim().length > 255) {
+      setPostError("Invalid Description (max 255 chars).");
       return;
     }
-    if (!isIsoDateString(startDate) || !isIsoDateString(endDate)) {
-      setPostError("Dates must be in yyyy-MM-dd format.");
-      return;
-    }
-
     // compare dates
-    // parse yyyy-MM-dd -> Date objects
     const [sy, sm, sd] = startDate.split("-").map((x) => parseInt(x, 10));
     const [ey, em, ed] = endDate.split("-").map((x) => parseInt(x, 10));
     const sdObj = new Date(sy, sm - 1, sd);
@@ -182,6 +169,140 @@ const ApplicationPage = () => {
     }
   }
 
+  // update helper for existing row (local only)
+  function updateRow(acronym, patch) {
+    setApps((prev) =>
+      prev.map((a) => {
+        if (a.App_Acronym !== acronym) return a;
+        return {
+          ...a,
+          ...patch,
+        };
+      })
+    );
+    // clear error for that row on change
+    setRowErrors((prev) => {
+      const next = { ...prev };
+      delete next[acronym];
+      return next;
+    });
+  }
+
+  // save handler for existing row
+  async function handleSaveRow(row) {
+    // row has current local values
+    const {
+      App_Acronym,
+      App_Description,
+      App_startDate,
+      App_endDate,
+      App_permit_Create,
+      App_permit_Open,
+      App_permit_ToDo,
+      App_permit_Doing,
+      App_permit_Done,
+    } = row;
+
+    // frontend validation same as create
+    if (!App_Description || !App_Description.trim()) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: "Description is required.",
+      }));
+      return;
+    }
+
+    if (!App_startDate || !App_endDate) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: "Both dates are required.",
+      }));
+      return;
+    }
+
+    // yyyy-MM-dd only
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(App_startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(App_endDate)
+    ) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: "Dates must be in yyyy-MM-dd format.",
+      }));
+      return;
+    }
+
+    const [sy, sm, sd] = App_startDate.split("-").map((x) => parseInt(x, 10));
+    const [ey, em, ed] = App_endDate.split("-").map((x) => parseInt(x, 10));
+    const sdObj = new Date(sy, sm - 1, sd);
+    const edObj = new Date(ey, em - 1, ed);
+    if (sdObj > edObj) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: "Start Date must be before or equal to End Date.",
+      }));
+      return;
+    }
+
+    const allOk =
+      Array.isArray(App_permit_Create) &&
+      App_permit_Create.length &&
+      Array.isArray(App_permit_Open) &&
+      App_permit_Open.length &&
+      Array.isArray(App_permit_ToDo) &&
+      App_permit_ToDo.length &&
+      Array.isArray(App_permit_Doing) &&
+      App_permit_Doing.length &&
+      Array.isArray(App_permit_Done) &&
+      App_permit_Done.length;
+
+    if (!allOk) {
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: "All permit fields require at least one group.",
+      }));
+      return;
+    }
+
+    try {
+      const res = await api.patch(`/applications/${App_Acronym}`, {
+        App_Description,
+        App_startDate,
+        App_endDate,
+        App_permit_Create,
+        App_permit_Open,
+        App_permit_ToDo,
+        App_permit_Doing,
+        App_permit_Done,
+      });
+      const updated = res.data;
+      if (updated) {
+        const norm = {
+          ...updated,
+          App_startDate: updated.App_startDate.split("T")[0],
+          App_endDate: updated.App_endDate.split("T")[0],
+        };
+        setApps((prev) =>
+          prev.map((a) =>
+            a.App_Acronym === norm.App_Acronym ? norm : a
+          )
+        );
+        setRowErrors((prev) => {
+          const next = { ...prev };
+          delete next[App_Acronym];
+          return next;
+        });
+      }
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error || "Failed to update application.";
+      setRowErrors((prev) => ({
+        ...prev,
+        [App_Acronym]: msg,
+      }));
+    }
+  }
+
   if (!ready) return null;
   if (!isAuthenticated) return null;
 
@@ -210,15 +331,17 @@ const ApplicationPage = () => {
             </thead>
 
             <tbody>
+              {/* CREATE ROW (only project lead) */}
               {isProjectLead && (
                 <>
-                  <tr className="bg-blue-100 align-top">
+                  <tr className="bg-blue-50/50">
                     {/* ACRONYM */}
                     <td className="px-3 py-2 align-top">
                       <input
                         className="w-full border rounded px-2 py-1"
                         value={acronym}
                         onChange={(e) => setAcronym(e.target.value)}
+                        placeholder="APP1"
                       />
                     </td>
 
@@ -229,30 +352,27 @@ const ApplicationPage = () => {
                         rows={2}
                         value={desc}
                         onChange={(e) => setDesc(e.target.value)}
+                        placeholder="desc"
                       />
                     </td>
 
-                    {/* START DATE (calendar, yyyy-MM-dd) */}
+                    {/* START DATE */}
                     <td className="px-3 py-2 align-top">
                       <input
-                        type="date"
+                      type="date"
                         className="w-full border rounded px-2 py-1"
                         value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value); // yyyy-MM-dd
-                        }}
+                        onChange={(e) => setStartDate(e.target.value)}
                       />
                     </td>
 
-                    {/* END DATE (calendar, yyyy-MM-dd) */}
+                    {/* END DATE */}
                     <td className="px-3 py-2 align-top">
                       <input
                         type="date"
                         className="w-full border rounded px-2 py-1"
                         value={endDate}
-                        onChange={(e) => {
-                          setEndDate(e.target.value); // yyyy-MM-dd
-                        }}
+                        onChange={(e) => setEndDate(e.target.value)}
                       />
                     </td>
 
@@ -324,7 +444,7 @@ const ApplicationPage = () => {
                   {/* Inline error below the create row */}
                   {postError ? (
                     <tr>
-                      <td colSpan={isProjectLead ? 11 : 10} className="px-3 pb-3">
+                      <td colSpan={11} className="px-3 pb-3">
                         <div className="mt-1 text-sm text-red-600">
                           {postError}
                         </div>
@@ -334,50 +454,203 @@ const ApplicationPage = () => {
                 </>
               )}
 
-              {/* Data rows (read-only) */}
-              {sortedApps.map((a) => (
-                <tr key={a.App_Acronym} className="border-t align-top">
-                  <td className="px-3 py-3 align-top">{a.App_Acronym}</td>
-                  <td className="px-3 py-3 align-top">
-                    <textarea
-                      readOnly
-                      className="w-full border rounded px-2 py-1 bg-gray-50"
-                      rows={2}
-                      value={a.App_Description || ""}
-                    />
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    {a.App_startDate || ""}
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    {a.App_endDate || ""}
-                  </td>
+              {/* Data rows (now editable for project lead) */}
+              {sortedApps.map((a) => {
+                const rowErr = rowErrors[a.App_Acronym];
+                return (
+                  <React.Fragment key={a.App_Acronym}>
+                    <tr className="border-t last:border-b">
+                      {/* ACRONYM (read-only) */}
+                      <td className="px-3 py-3 align-top font-semibold text-gray-800">
+                        {a.App_Acronym}
+                      </td>
 
-                  <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_Create} />
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_Open} />
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_ToDo} />
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_Doing} />
-                  </td>
-                  <td className="px-3 py-3 align-top">
-                    <Chips items={a.App_permit_Done} />
-                  </td>
+                      {/* DESCRIPTION (editable) */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <textarea
+                            className="w-full border rounded px-2 py-1"
+                            rows={2}
+                            value={a.App_Description || ""}
+                            onChange={(e) =>
+                              updateRow(a.App_Acronym, {
+                                App_Description: e.target.value,
+                              })
+                            }
+                          />
+                        ) : (
+                          <textarea
+                          readOnly
+                            className="w-full border rounded px-2 py-1 bg-gray-50"
+                            rows={2}
+                            value={a.App_Description || ""}
+                          />
+                        )}
+                      </td>
 
-                  <td className="px-3 py-3 align-top">{a.App_Rnumber ?? 0}</td>
-                  {isProjectLead && <td className="px-3 py-3 align-top"></td>}
-                </tr>
-              ))}
+                      {/* START DATE (editable for project lead) */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <input
+                            type="date"
+                            className="w-full border rounded px-2 py-1"
+                            value={a.App_startDate || ""}
+                            onChange={(e) =>
+                              updateRow(a.App_Acronym, {
+                                App_startDate: e.target.value,
+                              })
+                            }
+                          />
+                        ) : (
+                          <div>{a.App_startDate || ""}</div>
+                        )}
+                      </td>
+
+                      {/* END DATE */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <input
+                            type="date"
+                            className="w-full border rounded px-2 py-1"
+                            value={a.App_endDate || ""}
+                            onChange={(e) =>
+                              updateRow(a.App_Acronym, {
+                                App_endDate: e.target.value,
+                              })
+                            }
+                          />
+                        ) : (
+                          <div>{a.App_endDate || ""}</div>
+                        )}
+                      </td>
+
+                      {/* CREATE PERMIT */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <ChipsMultiSelect
+                            options={groups}
+                            value={a.App_permit_Create || []}
+                            onChange={(val) =>
+                              updateRow(a.App_Acronym, {
+                                App_permit_Create: val,
+                              })
+                            }
+                            placeholder="Select groups…"
+                          />
+                        ) : (
+                          <Chips items={a.App_permit_Create} />
+                        )}
+                      </td>
+
+                      {/* OPEN PERMIT */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <ChipsMultiSelect
+                            options={groups}
+                            value={a.App_permit_Open || []}
+                            onChange={(val) =>
+                              updateRow(a.App_Acronym, {
+                                App_permit_Open: val,
+                              })
+                            }
+                            placeholder="Select groups…"
+                          />
+                        ) : (
+                          <Chips items={a.App_permit_Open} />
+                        )}
+                      </td>
+
+                      {/* TO DO PERMIT */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <ChipsMultiSelect
+                            options={groups}
+                            value={a.App_permit_ToDo || []}
+                            onChange={(val) =>
+                              updateRow(a.App_Acronym, {
+                                App_permit_ToDo: val,
+                              })
+                            }
+                            placeholder="Select groups…"
+                          />
+                        ) : (
+                          <Chips items={a.App_permit_ToDo} />
+                        )}
+                      </td>
+
+                      {/* DOING PERMIT */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <ChipsMultiSelect
+                            options={groups}
+                            value={a.App_permit_Doing || []}
+                            onChange={(val) =>
+                              updateRow(a.App_Acronym, {
+                                App_permit_Doing: val,
+                              })
+                            }
+                            placeholder="Select groups…"
+                          />
+                        ) : (
+                          <Chips items={a.App_permit_Doing} />
+                        )}
+                      </td>
+
+                      {/* DONE PERMIT */}
+                      <td className="px-3 py-3 align-top">
+                        {isProjectLead ? (
+                          <ChipsMultiSelect
+                            options={groups}
+                            value={a.App_permit_Done || []}
+                            onChange={(val) =>
+                              updateRow(a.App_Acronym, {
+                                App_permit_Done: val,
+                              })
+                            }
+                            placeholder="Select groups…"
+                          />
+                        ) : (
+                          <Chips items={a.App_permit_Done} />
+                        )}
+                      </td>
+
+                      {/* TASKS (read-only) */}
+                      <td className="px-3 py-3 align-top">
+                        {a.App_Rnumber ?? 0}
+                      </td>
+
+                      {/* ACTION: Save (project lead only) */}
+                      {isProjectLead ? (
+                        <td className="px-3 py-3 align-top">
+                          <button
+                            className="px-3 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700"
+                            onClick={() => handleSaveRow(a)}
+                          >
+                            Save
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+
+                    {/* Per-row error */}
+                    {rowErr ? (
+                      <tr>
+                        <td
+                          colSpan={isProjectLead ? 11 : 10}
+                          className="px-3 pb-3"
+                        >
+                          <div className="text-sm text-red-600">{rowErr}</div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </React.Fragment>
+                );
+              })}
 
               {sortedApps.length === 0 && !isProjectLead && (
                 <tr>
                   <td colSpan={10} className="px-3 py-6 text-gray-500">
-                    {/* empty table state */}
+                    No applications found.
                   </td>
                 </tr>
               )}

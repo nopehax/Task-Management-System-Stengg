@@ -16,14 +16,9 @@ function normalizeRow(row) {
   const out = {
     App_Acronym: row.App_Acronym,
     App_Description: row.App_Description,
-    App_Rnumber: Number(row.App_Rnumber ?? 0),
-    App_startDate: row.App_startDate || "",
-    App_endDate: row.App_endDate || "",
-    App_permit_Create: [],
-    App_permit_Open: [],
-    App_permit_ToDo: [],
-    App_permit_Doing: [],
-    App_permit_Done: [],
+    App_Rnumber: row.App_Rnumber,
+    App_startDate: row.App_startDate,
+    App_endDate: row.App_endDate,
   };
 
   // Parse JSON arrays for permit fields
@@ -57,18 +52,16 @@ function isIsoDateString(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
 }
 
-/* GET /api/applications
-   Any authenticated user. Read-only list. Sorted by acronym A→Z. */
-router.get("/applications", authRequired, async (req, res) => {
+/* GET /api/applications */
+router.get("/applications", authRequired, async (_req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT App_Acronym, App_Description, App_Rnumber,
-              App_startDate, App_endDate,
-              App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
-         FROM applications
-         ORDER BY App_Acronym ASC`
+        App_startDate, App_endDate,
+        App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
+        FROM applications
+        ORDER BY App_Acronym ASC`
     );
-
     const data = rows.map(normalizeRow);
     res.json(data);
   } catch (err) {
@@ -104,9 +97,7 @@ router.post(
         typeof App_Acronym !== "string" ||
         App_Acronym.length > 50
       ) {
-        return res
-          .status(400)
-          .json({ error: "Invalid Acronym (max 50 chars)" });
+        return res.status(400).json({ error: "Invalid Acronym) max 50 chars)" });
       }
 
       // Description validation
@@ -138,7 +129,6 @@ router.post(
       }
 
       // Permit validation:
-      // each must be an array of >=1 valid group strings
       const groupsOk =
         ensureArrayOfStrings(App_permit_Create) &&
         ensureArrayOfStrings(App_permit_Open) &&
@@ -205,6 +195,132 @@ router.post(
       }
       console.error("POST /api/applications error:", err);
       return res.status(500).json({ error: "Failed to create application" });
+    }
+  }
+);
+
+/* PATCH /api/applications/:acronym
+   Only 'project lead' can edit.
+   Everything is editable EXCEPT:
+   - App_Acronym
+   - App_Rnumber
+*/
+router.patch("/applications/:acronym", authRequired, requireGroup(["project lead"]), async (req, res) => {
+    const { acronym } = req.params;
+    try {
+      // first check record exists
+      const [rows] = await pool.query(
+        `SELECT App_Acronym FROM applications WHERE App_Acronym = ?`,
+        [acronym]
+      );
+      if (!rows.length) {
+        return res.status(404).json({ error: "Application not found" });
+      }
+
+      const {
+        App_Description,
+        App_startDate,
+        App_endDate,
+        App_permit_Create,
+        App_permit_Open,
+        App_permit_ToDo,
+        App_permit_Doing,
+        App_permit_Done,
+      } = req.body || {};
+      
+      // all fields mandatory on update too
+      if (
+        !App_Description ||
+        typeof App_Description !== "string" ||
+        !App_Description.trim()
+      ) {
+        return res.status(400).json({ error: "Description is required" });
+      }
+
+      if (!isIsoDateString(App_startDate) || !isIsoDateString(App_endDate)) {
+        return res
+          .status(400)
+          .json({ error: "Dates must be in yyyy-MM-dd format" });
+        }
+        
+        const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
+      const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
+      const startObj = new Date(sy, sm - 1, sd);
+      const endObj = new Date(ey, em - 1, ed);
+      
+      if (startObj > endObj) {
+        return res.status(400).json({
+          error: "Start Date must be before or equal to End Date",
+        });
+      }
+
+      const groupsOk =
+        ensureArrayOfStrings(App_permit_Create) &&
+        ensureArrayOfStrings(App_permit_Open) &&
+        ensureArrayOfStrings(App_permit_ToDo) &&
+        ensureArrayOfStrings(App_permit_Doing) &&
+        ensureArrayOfStrings(App_permit_Done) &&
+        App_permit_Create.length > 0 &&
+        App_permit_Open.length > 0 &&
+        App_permit_ToDo.length > 0 &&
+        App_permit_Doing.length > 0 &&
+        App_permit_Done.length > 0;
+
+        if (!groupsOk) {
+          return res.status(400).json({
+            error:
+            "All permit fields must be arrays of at least one valid group name",
+          });
+        }
+
+      // update
+      await pool.query(
+        `
+        UPDATE applications
+           SET App_Description = ?,
+               App_startDate = ?,
+               App_endDate = ?,
+               App_permit_Create = ?,
+               App_permit_Open = ?,
+               App_permit_ToDo = ?,
+               App_permit_Doing = ?,
+               App_permit_Done = ?
+         WHERE App_Acronym = ?
+        `,
+        [
+          App_Description.trim(),
+          App_startDate,
+          App_endDate,
+          JSON.stringify(App_permit_Create),
+          JSON.stringify(App_permit_Open),
+          JSON.stringify(App_permit_ToDo),
+          JSON.stringify(App_permit_Doing),
+          JSON.stringify(App_permit_Done),
+          acronym,
+        ]
+      );
+
+      // read it back
+      const [rows2] = await pool.query(
+        `SELECT App_Acronym, App_Description, App_Rnumber,
+                App_startDate, App_endDate,
+                App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done
+           FROM applications
+          WHERE App_Acronym = ?`,
+        [acronym]
+      );
+
+      if (!rows2.length) {
+        return res
+          .status(500)
+          .json({ error: "Failed to read updated record" });
+      }
+
+      const record = normalizeRow(rows2[0]);
+      return res.json(record);
+    } catch (err) {
+      console.error("PATCH /api/applications/:acronym error:", err);
+      return res.status(500).json({ error: "Failed to update application" });
     }
   }
 );
