@@ -205,7 +205,7 @@ router.post("/tasks", authRequired, async (req, res) => {
     [Task_app_acronym.trim()]
   );
   const allowedGroups = rows[0].App_permit_Create || "[]";
-  if (!checkGroup(req.auth?.username, allowedGroups)) {
+  if (!(await checkGroup(req.auth?.username, allowedGroups))) {
     return res.status(403).json({ error: "Not authorized" });
   }
 
@@ -354,7 +354,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
   } = req.body || {};
 
   // check that user is allowed to edit this task
-  let [rows] = await pool.query(
+  const [rows] = await pool.query(
         `SELECT Task_state
            FROM tasks
           WHERE Task_id = ?
@@ -363,18 +363,18 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       );
   const taskCurrState = rows[0].Task_state
   const permit = 'App_permit_' + taskCurrState;
-  [rows] = await pool.query(
-    `SELECT ?
+  const [rows2] = await pool.query(
+    `SELECT \`${permit}\`
       FROM applications
       WHERE App_Acronym = ?
       LIMIT 1`,
-    [permit,acronym]
+    [acronym]
   );
-  if (!rows.length) {
+  if (!rows2.length) {
     return res.status(500).json({ error: "Failed to read application" });
   }
-  const allowedGroups = rows[0][permit] || "[]";
-  if (!checkGroup(req.auth.username, allowedGroups)) {
+  const allowedGroups = rows2[0][permit] || "[]";
+  if (!(await checkGroup(req.auth.username, allowedGroups))) {
     return res.status(403).json({ error: "Not authorized" });
   }
 
