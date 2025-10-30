@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const { pool } = require("../config/db");
 const { authRequired, checkGroup } = require("../middleware/auth");
+const { triggerEmailSend } = require("../config/sendEmail");
 
 function isIsoDateString(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -457,6 +458,13 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
         params.push(taskOwner.trim());
       }
       if (Task_state === "Done") {
+        if (taskCurrState === "Doing") {
+          try {
+            await triggerEmailSend(taskId, req.auth.username);
+          } catch (err) {
+            console.error("Failed to trigger email:", err.message);
+          }
+        }
         if (taskCurrState !== "Doing") {
           await conn.rollback();
           return res.status(400).json({
