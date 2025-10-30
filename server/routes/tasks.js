@@ -193,7 +193,7 @@ router.post("/tasks", authRequired, async (req, res) => {
   }
 
   // check if user is allowed to create a task in this application.
-  const task_owner = req.auth?.username
+  const task_owner = "(unassigned)";
   const [rows] = await pool.query(
     `SELECT App_permit_Create
       FROM applications
@@ -202,7 +202,7 @@ router.post("/tasks", authRequired, async (req, res) => {
     [Task_app_acronym.trim()]
   );
   const allowedGroups = rows[0].App_permit_Create || "[]";
-  if (!checkGroup(req.auth.username, allowedGroups)) {
+  if (!checkGroup(req.auth?.username, allowedGroups)) {
     return res.status(403).json({ error: "Not authorized" });
   }
 
@@ -335,7 +335,7 @@ router.post("/tasks", authRequired, async (req, res) => {
  *
  * Editable fields:
  *   - Task_plan         (must exist in plans)
- *   - Task_owner
+ *   - Task_owner        (assigned to whoever picks up the task)
  *   - Task_state        (must be one of enum)
  *   - Task_notes        (must still be valid object)
  *
@@ -417,10 +417,10 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       params.push(Task_plan.trim());
     }
 
-    // Task_owner (optional)
-    const taskOwner = req.auth.username;
-    updates.push("Task_owner = ?");
-    params.push(taskOwner.trim());
+    // Task_owner (if base on last touch)
+    // const taskOwner = req.auth.username;
+    // updates.push("Task_owner = ?");
+    // params.push(taskOwner.trim());
 
     // Task_state (optional)
     if (typeof Task_state !== "undefined") {
@@ -444,6 +444,9 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
             error: "Cannot move task from " + taskCurrState + " to ToDo",
           });
         }
+        const taskOwner = "(unassigned)";
+        updates.push("Task_owner = ?");
+        params.push(taskOwner.trim());
       }
       if (Task_state === "Doing") {
         if (!(taskCurrState === "ToDo" || taskCurrState == "Done")) {
@@ -452,6 +455,9 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
             error: "Cannot move task from " + taskCurrState + " to Doing",
           });
         }
+        const taskOwner = req.auth.username;
+        updates.push("Task_owner = ?");
+        params.push(taskOwner.trim());
       }
       if (Task_state === "Done") {
         if (taskCurrState !== "Doing") {
@@ -471,7 +477,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
       }
       
       const stateChangeNote = {
-        author: taskOwner,
+        author: req.auth.username,
         status: taskCurrState,
         datetime: new Date().toISOString(),
         message: `Task state changed from "${taskCurrState}" to "${Task_state}"`,
