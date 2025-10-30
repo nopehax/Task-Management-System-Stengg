@@ -16,10 +16,10 @@ const mailer = nodemailer.createTransport({
 });
 
 const triggerEmailSend = async (taskId, username) => {
-  // 1. load application to get App_permit_Create
+  // 1. load application to get App_permit_Done
   const appAcronym = taskId.split("_")[0];
   const [apps] = await pool.query(
-    `SELECT App_permit_Create FROM applications WHERE App_Acronym = ?`,
+    `SELECT App_permit_Done FROM applications WHERE App_Acronym = ?`,
     [appAcronym]
   );
   if (!apps.length) {
