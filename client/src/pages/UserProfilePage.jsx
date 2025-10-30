@@ -124,94 +124,96 @@ export default function UserProfilePage() {
     : [];
 
   return (
-    <div className="p-6">
+    <>
       <HeaderPage />
-      <h1 className="text-center text-2xl font-semibold my-6">Update Profile</h1>
+      <div className="p-6">
+        <h1 className="text-center text-2xl font-semibold my-6">Update Profile</h1>
 
-      <div className="max-w-md mx-auto rounded-xl border border-slate-200 p-6">
-        <form onSubmit={onSubmit} className="space-y-4">
-          {/* Read-only identity */}
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">Username</label>
-            <input
-              className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
-              value={user.username || ""}
-              disabled
-            />
-          </div>
+        <div className="max-w-md mx-auto rounded-xl border border-slate-200 p-6">
+          <form onSubmit={onSubmit} className="space-y-4">
+            {/* Read-only identity */}
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Username</label>
+              <input
+                className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
+                value={user.username || ""}
+                disabled
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">Groups</label>
-            <input
-              className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
-              value={groups.join(", ")}
-              disabled
-            />
-          </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Groups</label>
+              <input
+                className="w-full rounded-md border border-slate-300 bg-slate-100 text-slate-500 px-3 py-2"
+                value={groups.join(", ")}
+                disabled
+              />
+            </div>
 
-          {/* Editable: Email */}
-          <div className="pt-2">
-            <label className="block text-sm text-slate-700 mb-1">Email</label>
-            <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-              value={form.email}
-              onChange={onChange("email")}
-              placeholder="you@example.com"
-            />
-          </div>
+            {/* Editable: Email */}
+            <div className="pt-2">
+              <label className="block text-sm text-slate-700 mb-1">Email</label>
+              <input
+                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                value={form.email}
+                onChange={onChange("email")}
+                placeholder="you@example.com"
+              />
+            </div>
 
-          {/* Editable: Passwords (current + new + confirm) */}
-          <div className="pt-2">
-            <label className="block text-sm text-slate-700 mb-1">
-              Current Password
-            </label>
-            <input
-              type="password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-              value={form.currentPassword}
-              onChange={onChange("currentPassword")}
-              placeholder="********"
-            />
-          </div>
+            {/* Editable: Passwords (current + new + confirm) */}
+            <div className="pt-2">
+              <label className="block text-sm text-slate-700 mb-1">
+                Current Password
+              </label>
+              <input
+                type="password"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                value={form.currentPassword}
+                onChange={onChange("currentPassword")}
+                placeholder="********"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm text-slate-700 mb-1">New Password</label>
-            <input
-              type="password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-              value={form.password}
-              onChange={onChange("password")}
-              placeholder="********"
-            />
-          </div>
+            <div>
+              <label className="block text-sm text-slate-700 mb-1">New Password</label>
+              <input
+                type="password"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                value={form.password}
+                onChange={onChange("password")}
+                placeholder="********"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm text-slate-700 mb-1">
-              Confirm Password
-            </label>
-            <input
-              type="password"
-              className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
-              value={form.confirmPassword}
-              onChange={onChange("confirmPassword")}
-              placeholder="********"
-            />
-          </div>
+            <div>
+              <label className="block text-sm text-slate-700 mb-1">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                className="w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500"
+                value={form.confirmPassword}
+                onChange={onChange("confirmPassword")}
+                placeholder="********"
+              />
+            </div>
 
-          {/* Messages */}
-          {error && <div className="text-red-600 text-sm">{error}</div>}
-          {success && <div className="text-emerald-600 text-sm">{success}</div>}
+            {/* Messages */}
+            {error && <div className="text-red-600 text-sm">{error}</div>}
+            {success && <div className="text-emerald-600 text-sm">{success}</div>}
 
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={saving}
-            className="mt-2 w-full rounded-md bg-slate-900 text-white px-4 py-2 disabled:opacity-60"
-          >
-            {saving ? "Saving…" : "Submit"}
-          </button>
-        </form>
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={saving}
+              className="mt-2 w-full rounded-md bg-slate-900 text-white px-4 py-2 disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Submit"}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -100,16 +100,14 @@ export default function HeaderPage() {
               >
                 Kanban Board
               </button>
-              {user?.userGroups?.includes("project lead") && (
-                <button
-                  type="button"
-                  onClick={handleApplications}
-                  className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                  role="menuitem"
-                >
-                  App Management
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={handleApplications}
+                className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                role="menuitem"
+              >
+                Applications
+              </button>
               {user?.userGroups?.includes("admin") && (
                 <button
                   type="button"
