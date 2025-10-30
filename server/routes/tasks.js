@@ -43,7 +43,7 @@ function isValidState(s) {
 }
 
 // helper: validate Task_notes shape
-function isValidNotes(obj) {
+function isValidNotes(obj, taskCurrState) {
   if (typeof obj !== "object" || obj === null || Array.isArray(obj)) return false;
   // required keys author/status/datetime/note as strings
   const requiredKeys = ["author", "status", "note"];
@@ -51,6 +51,8 @@ function isValidNotes(obj) {
     if (!(k in obj)) return false;
     if (typeof obj[k] !== "string") return false;
   }
+  if (!obj.note) return false;
+  if (obj.status !== taskCurrState) return false;
   return true;
 }
 
@@ -487,11 +489,11 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
 
     // Task_notes (optional)
     if (typeof Task_notes !== "undefined") {
-      if (!isValidNotes(Task_notes)) {
+      if (!isValidNotes(Task_notes, taskCurrState)) {
         await conn.rollback();
         return res.status(400).json({
           error:
-            "Invalid Task_notes; must include {author,status,note} as strings",
+            "Invalid Task_note or no permission",
         });
       }
       const withDatetime = {
