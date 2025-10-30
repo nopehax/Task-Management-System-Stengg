@@ -7,6 +7,7 @@ const { authRequired, requireGroup } = require("../middleware/auth");
 
 function ensureArrayOfStrings(v) {
   if (!Array.isArray(v)) return false;
+  if (v.length === 0) return true;
   return v.every((x) => typeof x === "string" && x.trim().length > 0);
 }
 
@@ -17,8 +18,8 @@ function normalizeRow(row) {
     App_Acronym: row.App_Acronym,
     App_Description: row.App_Description,
     App_Rnumber: row.App_Rnumber,
-    App_startDate: row.App_startDate,
-    App_endDate: row.App_endDate,
+    App_startDate: row.App_startDate || '',
+    App_endDate: row.App_endDate || '',
   };
 
   // Parse JSON arrays for permit fields
@@ -73,11 +74,7 @@ router.get("/applications", authRequired, async (_req, res) => {
 /* POST /api/applications
    Only users in 'project lead'. All fields mandatory; Rnumber starts at 0.
    Dates are accepted as-is from the frontend (yyyy-MM-dd) and written directly to MySQL. */
-router.post(
-  "/applications",
-  authRequired,
-  requireGroup(["project lead"]),
-  async (req, res) => {
+router.post("/applications", authRequired, requireGroup(["project lead"]), async (req, res) => {
     try {
       const {
         App_Acronym,
@@ -101,31 +98,29 @@ router.post(
       }
 
       // Description validation
-      if (
-        !App_Description ||
-        typeof App_Description !== "string" ||
-        !App_Description.trim()
-      ) {
-        return res.status(400).json({ error: "Description is required" });
+      if (typeof App_Description !== "string" || (!App_Description.trim().length > 255)) {
+        return res.status(400).json({ error: "Invalid Description (max 255 chars)" });
       }
 
       // Date validation (yyyy-MM-dd, start <= end)
-      if (!isIsoDateString(App_startDate) || !isIsoDateString(App_endDate)) {
-        return res
-          .status(400)
-          .json({ error: "Dates must be in yyyy-MM-dd format" });
-      }
+      if (App_startDate && App_endDate) {
+        if (!isIsoDateString(App_startDate) || !isIsoDateString(App_endDate)) {
+          return res
+            .status(400)
+            .json({ error: "Dates must be in yyyy-MM-dd format" });
+        }
 
-      // compare as actual dates
-      const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
-      const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
-      const startObj = new Date(sy, sm - 1, sd);
-      const endObj = new Date(ey, em - 1, ed);
+        // compare as actual dates
+        const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
+        const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
+        const startObj = new Date(sy, sm - 1, sd);
+        const endObj = new Date(ey, em - 1, ed);
 
-      if (startObj > endObj) {
-        return res.status(400).json({
-          error: "Start Date must be before or equal to End Date",
-        });
+        if (startObj > endObj) {
+          return res.status(400).json({
+            error: "Start Date must be before or equal to End Date",
+          });
+        }
       }
 
       // Permit validation:
@@ -134,17 +129,12 @@ router.post(
         ensureArrayOfStrings(App_permit_Open) &&
         ensureArrayOfStrings(App_permit_ToDo) &&
         ensureArrayOfStrings(App_permit_Doing) &&
-        ensureArrayOfStrings(App_permit_Done) &&
-        App_permit_Create.length > 0 &&
-        App_permit_Open.length > 0 &&
-        App_permit_ToDo.length > 0 &&
-        App_permit_Doing.length > 0 &&
-        App_permit_Done.length > 0;
+        ensureArrayOfStrings(App_permit_Done);
 
       if (!groupsOk) {
         return res.status(400).json({
           error:
-            "All permit fields must be arrays of at least one valid group name",
+            "All permit fields must be arrays",
         });
       }
 
@@ -156,12 +146,11 @@ router.post(
           App_permit_Create, App_permit_Open, App_permit_ToDo, App_permit_Doing, App_permit_Done)
         VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)
       `;
-
       const params = [
         App_Acronym.trim(),
         App_Description.trim(),
-        App_startDate,
-        App_endDate,
+        App_startDate || null,
+        App_endDate || null,
         JSON.stringify(App_permit_Create),
         JSON.stringify(App_permit_Open),
         JSON.stringify(App_permit_ToDo),
@@ -228,30 +217,22 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
         App_permit_Done,
       } = req.body || {};
       
-      // all fields mandatory on update too
-      if (
-        !App_Description ||
-        typeof App_Description !== "string" ||
-        !App_Description.trim()
-      ) {
-        return res.status(400).json({ error: "Description is required" });
+      // fields can be empty on update
+      if (typeof App_Description !== "string" || (!App_Description.trim().length > 255)) {
+        return res.status(400).json({ error: "Invalid Description (max 255 chars)" });
       }
-
-      if (!isIsoDateString(App_startDate) || !isIsoDateString(App_endDate)) {
-        return res
-          .status(400)
-          .json({ error: "Dates must be in yyyy-MM-dd format" });
-        }
-        
-        const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
-      const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
-      const startObj = new Date(sy, sm - 1, sd);
-      const endObj = new Date(ey, em - 1, ed);
       
-      if (startObj > endObj) {
-        return res.status(400).json({
-          error: "Start Date must be before or equal to End Date",
-        });
+      if (App_startDate && App_endDate) {
+        const [sy, sm, sd] = App_startDate.split("-").map((n) => parseInt(n, 10));
+        const [ey, em, ed] = App_endDate.split("-").map((n) => parseInt(n, 10));
+        const startObj = new Date(sy, sm - 1, sd);
+        const endObj = new Date(ey, em - 1, ed);
+        
+        if (startObj > endObj) {
+          return res.status(400).json({
+            error: "Start Date must be before or equal to End Date",
+          });
+        }
       }
 
       const groupsOk =
@@ -259,17 +240,12 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
         ensureArrayOfStrings(App_permit_Open) &&
         ensureArrayOfStrings(App_permit_ToDo) &&
         ensureArrayOfStrings(App_permit_Doing) &&
-        ensureArrayOfStrings(App_permit_Done) &&
-        App_permit_Create.length > 0 &&
-        App_permit_Open.length > 0 &&
-        App_permit_ToDo.length > 0 &&
-        App_permit_Doing.length > 0 &&
-        App_permit_Done.length > 0;
+        ensureArrayOfStrings(App_permit_Done);
 
         if (!groupsOk) {
           return res.status(400).json({
             error:
-            "All permit fields must be arrays of at least one valid group name",
+            "All permit fields must be arrays",
           });
         }
 
@@ -289,8 +265,8 @@ router.patch("/applications/:acronym", authRequired, requireGroup(["project lead
         `,
         [
           App_Description.trim(),
-          App_startDate,
-          App_endDate,
+          App_startDate || null,
+          App_endDate || null,
           JSON.stringify(App_permit_Create),
           JSON.stringify(App_permit_Open),
           JSON.stringify(App_permit_ToDo),

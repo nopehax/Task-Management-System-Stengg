@@ -116,17 +116,6 @@ const ApplicationPage = () => {
       return;
     }
 
-    const allOk =
-      permitCreate.length &&
-      permitOpen.length &&
-      permitToDo.length &&
-      permitDoing.length &&
-      permitDone.length;
-    if (!allOk) {
-      setPostError("All permit fields require at least one group.");
-      return;
-    }
-
     try {
       const body = {
         App_Acronym: acronym,
@@ -204,62 +193,39 @@ const ApplicationPage = () => {
     } = row;
 
     // frontend validation same as create
-    if (!App_Description || !App_Description.trim()) {
+    if (!App_Description.trim() && App_Description.trim().length > 255) {
       setRowErrors((prev) => ({
         ...prev,
-        [App_Acronym]: "Description is required.",
+        [App_Acronym]: "Invalid Description (max 255 chars).",
       }));
       return;
     }
 
-    if (!App_startDate || !App_endDate) {
-      setRowErrors((prev) => ({
-        ...prev,
-        [App_Acronym]: "Both dates are required.",
-      }));
-      return;
-    }
-
-    // yyyy-MM-dd only
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(App_startDate) ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(App_endDate)
-    ) {
-      setRowErrors((prev) => ({
-        ...prev,
-        [App_Acronym]: "Dates must be in yyyy-MM-dd format.",
-      }));
-      return;
-    }
-
-    const [sy, sm, sd] = App_startDate.split("-").map((x) => parseInt(x, 10));
-    const [ey, em, ed] = App_endDate.split("-").map((x) => parseInt(x, 10));
-    const sdObj = new Date(sy, sm - 1, sd);
-    const edObj = new Date(ey, em - 1, ed);
-    if (sdObj > edObj) {
-      setRowErrors((prev) => ({
-        ...prev,
-        [App_Acronym]: "Start Date must be before or equal to End Date.",
-      }));
-      return;
+    if (App_startDate && App_endDate) {
+      const [sy, sm, sd] = App_startDate.split("-").map((x) => parseInt(x, 10));
+      const [ey, em, ed] = App_endDate.split("-").map((x) => parseInt(x, 10));
+      const sdObj = new Date(sy, sm - 1, sd);
+      const edObj = new Date(ey, em - 1, ed);
+      if (sdObj > edObj) {
+        setRowErrors((prev) => ({
+          ...prev,
+          [App_Acronym]: "Start Date must be before or equal to End Date.",
+        }));
+        return;
+      }
     }
 
     const allOk =
       Array.isArray(App_permit_Create) &&
-      App_permit_Create.length &&
       Array.isArray(App_permit_Open) &&
-      App_permit_Open.length &&
       Array.isArray(App_permit_ToDo) &&
-      App_permit_ToDo.length &&
       Array.isArray(App_permit_Doing) &&
-      App_permit_Doing.length &&
-      Array.isArray(App_permit_Done) &&
-      App_permit_Done.length;
+      Array.isArray(App_permit_Done);
 
     if (!allOk) {
       setRowErrors((prev) => ({
         ...prev,
-        [App_Acronym]: "All permit fields require at least one group.",
+        [App_Acronym]: "Invalid permit fields",
       }));
       return;
     }
