@@ -346,7 +346,14 @@ export default function TaskPage() {
     }
 
     try {
+      // sending email takes abit, so show loading indicator
+      if (targetState === "Done") {
+        setTaskModalError("Loading...");
+      }
       const res = await api.patch(`/tasks/${activeTaskId}`, payload);
+      if (targetState === "Done") {
+        setTaskModalError("");
+      }
       const updated = res.data;
       if (updated) {
         setTasks((prev) =>
