@@ -25,6 +25,34 @@ const Chips = ({ items }) => {
       ))}
     </div>
   );
+};
+
+// shallow compare for the fields we care about
+function appEqualsCurrentToOrig(curr) {
+  const o = curr.__orig;
+  if (!o) return false;
+  if ((curr.App_Description || "") !== (o.App_Description || "")) return false;
+  if ((curr.App_startDate || "") !== (o.App_startDate || "")) return false;
+  if ((curr.App_endDate || "") !== (o.App_endDate || "")) return false;
+
+  const pairs = [
+    ["App_permit_Create", curr.App_permit_Create, o.App_permit_Create],
+    ["App_permit_Open", curr.App_permit_Open, o.App_permit_Open],
+    ["App_permit_ToDo", curr.App_permit_ToDo, o.App_permit_ToDo],
+    ["App_permit_Doing", curr.App_permit_Doing, o.App_permit_Doing],
+    ["App_permit_Done", curr.App_permit_Done, o.App_permit_Done],
+  ];
+
+  for (const [, a, b] of pairs) {
+    const aa = Array.isArray(a) ? a : [];
+    const bb = Array.isArray(b) ? b : [];
+    if (aa.length !== bb.length) return false;
+    for (let i = 0; i < aa.length; i++) {
+      if (aa[i] !== bb[i]) return false;
+    }
+  }
+
+  return true;
 }
 
 const ApplicationPage = () => {
@@ -33,12 +61,11 @@ const ApplicationPage = () => {
 
   const [apps, setApps] = useState([]);
   const [groups, setGroups] = useState([]);
-  
-  // per-row error for updates
+
   const [postError, setPostError] = useState("");
   const [rowErrors, setRowErrors] = useState({});
 
-  // Create-row state
+  // create-row state
   const [acronym, setAcronym] = useState("");
   const [desc, setDesc] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -59,25 +86,25 @@ const ApplicationPage = () => {
           api.get("/usergroups"),
         ]);
         if (!mounted) return;
-        console.log(appsRes);
-        console.log(groupsRes)
-        const list = Array.isArray(appsRes.data)
-          ? appsRes.data
-          : [];
-        console.log(list)
-        const norm = list.map(a => ({
-          ...a,
-          App_startDate: a.App_startDate.split("T")[0],
-          App_endDate: a.App_endDate.split("T")[0],
-        }));
+        const list = Array.isArray(appsRes.data) ? appsRes.data : [];
+        // normalize dates + attach __orig
+        const norm = list.map((a) => {
+          const normalized = {
+            ...a,
+            App_startDate: a.App_startDate.split("T")[0] || "",
+            App_endDate: a.App_endDate.split("T")[0] || "",
+          };
+          return {
+            ...normalized,
+            __orig: { ...normalized },
+            __dirty: false,
+          };
+        });
         setApps(norm);
 
-        const g = Array.isArray(groupsRes.data)
-          ? groupsRes.data
-          : [];
+        const g = Array.isArray(groupsRes.data) ? groupsRes.data : [];
         setGroups(g);
       } catch (_err) {
-        // show empty table on load errors
         setApps([]);
         setGroups([]);
       }
@@ -132,13 +159,18 @@ const ApplicationPage = () => {
       const res = await api.post("/applications", body);
       const created = res.data;
       if (created) {
-        const norm = {
+        const normalized = {
           ...created,
-          App_startDate: created.App_startDate.split("T")[0],
-          App_endDate: created.App_endDate.split("T")[0],
+          App_startDate: created.App_startDate.split("T")[0] || "",
+          App_endDate: created.App_endDate.split("T")[0] || "",
         };
-        setApps((prev) => [norm, ...prev]);
-        // clear inputs
+        const withOrig = {
+          ...normalized,
+          __orig: { ...normalized },
+          __dirty: false,
+        };
+        setApps((prev) => [withOrig, ...prev]);
+
         setAcronym("");
         setDesc("");
         setStartDate("");
@@ -158,18 +190,22 @@ const ApplicationPage = () => {
     }
   }
 
-  // update helper for existing row (local only)
+  // update a row field and recompute dirty based on __orig
   function updateRow(acronym, patch) {
     setApps((prev) =>
       prev.map((a) => {
         if (a.App_Acronym !== acronym) return a;
-        return {
+        const next = {
           ...a,
           ...patch,
         };
+        const isSame = appEqualsCurrentToOrig(next);
+        return {
+          ...next,
+          __dirty: !isSame,
+        };
       })
     );
-    // clear error for that row on change
     setRowErrors((prev) => {
       const next = { ...prev };
       delete next[acronym];
@@ -177,9 +213,7 @@ const ApplicationPage = () => {
     });
   }
 
-  // save handler for existing row
   async function handleSaveRow(row) {
-    // row has current local values
     const {
       App_Acronym,
       App_Description,
@@ -192,7 +226,6 @@ const ApplicationPage = () => {
       App_permit_Done,
     } = row;
 
-    // frontend validation same as create
     if (!App_Description.trim() && App_Description.trim().length > 255) {
       setRowErrors((prev) => ({
         ...prev,
@@ -243,15 +276,21 @@ const ApplicationPage = () => {
       });
       const updated = res.data;
       if (updated) {
-        const norm = {
+        const normalized = {
           ...updated,
-          App_startDate: updated.App_startDate.split("T")[0],
-          App_endDate: updated.App_endDate.split("T")[0],
+          App_startDate: (updated.App_startDate || "").split("T")[0] || "",
+          App_endDate: (updated.App_endDate || "").split("T")[0] || "",
         };
         setApps((prev) =>
-          prev.map((a) =>
-            a.App_Acronym === norm.App_Acronym ? norm : a
-          )
+          prev.map((a) => {
+            if (a.App_Acronym !== normalized.App_Acronym) return a;
+            // reset __orig to the saved version
+            return {
+              ...normalized,
+              __orig: { ...normalized },
+              __dirty: false,
+            };
+          })
         );
         setRowErrors((prev) => {
           const next = { ...prev };
@@ -295,7 +334,6 @@ const ApplicationPage = () => {
                 {isProjectLead && <th className="px-3 py-3 w-[56px]"></th>}
               </tr>
             </thead>
-
             <tbody>
               {/* CREATE ROW (only project lead) */}
               {isProjectLead && (
@@ -310,7 +348,6 @@ const ApplicationPage = () => {
                         placeholder="APP1"
                       />
                     </td>
-
                     {/* DESCRIPTION */}
                     <td className="px-3 py-2 align-top">
                       <textarea
@@ -321,17 +358,15 @@ const ApplicationPage = () => {
                         placeholder="desc"
                       />
                     </td>
-
                     {/* START DATE */}
                     <td className="px-3 py-2 align-top">
                       <input
-                      type="date"
+                        type="date"
                         className="w-full border rounded px-2 py-1"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
                       />
                     </td>
-
                     {/* END DATE */}
                     <td className="px-3 py-2 align-top">
                       <input
@@ -341,7 +376,6 @@ const ApplicationPage = () => {
                         onChange={(e) => setEndDate(e.target.value)}
                       />
                     </td>
-
                     {/* CREATE PERMIT */}
                     <td className="px-3 py-2 align-top">
                       <ChipsMultiSelect
@@ -351,7 +385,6 @@ const ApplicationPage = () => {
                         placeholder="Select groups…"
                       />
                     </td>
-
                     {/* OPEN PERMIT */}
                     <td className="px-3 py-2 align-top">
                       <ChipsMultiSelect
@@ -361,7 +394,6 @@ const ApplicationPage = () => {
                         placeholder="Select groups…"
                       />
                     </td>
-
                     {/* TO DO PERMIT */}
                     <td className="px-3 py-2 align-top">
                       <ChipsMultiSelect
@@ -371,7 +403,6 @@ const ApplicationPage = () => {
                         placeholder="Select groups…"
                       />
                     </td>
-
                     {/* DOING PERMIT */}
                     <td className="px-3 py-2 align-top">
                       <ChipsMultiSelect
@@ -381,7 +412,6 @@ const ApplicationPage = () => {
                         placeholder="Select groups…"
                       />
                     </td>
-
                     {/* DONE PERMIT */}
                     <td className="px-3 py-2 align-top">
                       <ChipsMultiSelect
@@ -391,14 +421,11 @@ const ApplicationPage = () => {
                         placeholder="Select groups…"
                       />
                     </td>
-
                     {/* TASKS (read-only = 0 on create) */}
                     <td className="px-3 py-2 align-top text-gray-500">0</td>
-
-                    {/* Create button */}
                     <td className="px-3 py-2 align-top">
                       <button
-                        className="h-8 w-8 rounded-full bg-blue-600 text-white text-lg leading-8"
+                        className="h-8 w-8 rounded flex items-center justify-center item bg-blue-600 text-white text-2xl leading-none"
                         title="Create Application"
                         onClick={handleCreate}
                       >
@@ -406,7 +433,6 @@ const ApplicationPage = () => {
                       </button>
                     </td>
                   </tr>
-
                   {/* Inline error below the create row */}
                   {postError ? (
                     <tr>
@@ -420,9 +446,10 @@ const ApplicationPage = () => {
                 </>
               )}
 
-              {/* Data rows (now editable for project lead) */}
+              {/* DATA ROWS */}
               {sortedApps.map((a) => {
                 const rowErr = rowErrors[a.App_Acronym];
+                const isDirty = !!a.__dirty;
                 return (
                   <React.Fragment key={a.App_Acronym}>
                     <tr className="border-t last:border-b">
@@ -430,7 +457,6 @@ const ApplicationPage = () => {
                       <td className="px-3 py-3 align-top font-semibold text-gray-800">
                         {a.App_Acronym}
                       </td>
-
                       {/* DESCRIPTION (editable) */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -446,14 +472,13 @@ const ApplicationPage = () => {
                           />
                         ) : (
                           <textarea
-                          readOnly
+                            readOnly
                             className="w-full border rounded px-2 py-1 bg-gray-50"
                             rows={2}
                             value={a.App_Description || ""}
                           />
                         )}
                       </td>
-
                       {/* START DATE (editable for project lead) */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -471,7 +496,6 @@ const ApplicationPage = () => {
                           <div>{a.App_startDate || ""}</div>
                         )}
                       </td>
-
                       {/* END DATE */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -489,7 +513,6 @@ const ApplicationPage = () => {
                           <div>{a.App_endDate || ""}</div>
                         )}
                       </td>
-
                       {/* CREATE PERMIT */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -507,7 +530,6 @@ const ApplicationPage = () => {
                           <Chips items={a.App_permit_Create} />
                         )}
                       </td>
-
                       {/* OPEN PERMIT */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -525,7 +547,6 @@ const ApplicationPage = () => {
                           <Chips items={a.App_permit_Open} />
                         )}
                       </td>
-
                       {/* TO DO PERMIT */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -543,7 +564,6 @@ const ApplicationPage = () => {
                           <Chips items={a.App_permit_ToDo} />
                         )}
                       </td>
-
                       {/* DOING PERMIT */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -561,7 +581,6 @@ const ApplicationPage = () => {
                           <Chips items={a.App_permit_Doing} />
                         )}
                       </td>
-
                       {/* DONE PERMIT */}
                       <td className="px-3 py-3 align-top">
                         {isProjectLead ? (
@@ -579,25 +598,40 @@ const ApplicationPage = () => {
                           <Chips items={a.App_permit_Done} />
                         )}
                       </td>
-
                       {/* TASKS (read-only) */}
                       <td className="px-3 py-3 align-top">
                         {a.App_Rnumber ?? 0}
                       </td>
-
                       {/* ACTION: Save (project lead only) */}
                       {isProjectLead ? (
                         <td className="px-3 py-3 align-top">
                           <button
-                            className="px-3 py-1 text-xs rounded bg-green-600 text-white hover:bg-green-700"
-                            onClick={() => handleSaveRow(a)}
+                            className={`h-8 w-8 flex items-center justify-center rounded ${isDirty
+                                ? "bg-green-600 text-white hover:bg-green-700"
+                                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                              }`}
+                            onClick={() => isDirty && handleSaveRow(a)}
+                            disabled={!isDirty}
                           >
-                            Save
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.25"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                              <polyline points="17 21 17 13 7 13 7 21" />
+                              <polyline points="7 3 7 8 15 8" />
+                            </svg>
                           </button>
                         </td>
                       ) : null}
                     </tr>
-
                     {/* Per-row error */}
                     {rowErr ? (
                       <tr>
@@ -626,6 +660,6 @@ const ApplicationPage = () => {
       </div>
     </>
   );
-}
+};
 
 export default ApplicationPage;
