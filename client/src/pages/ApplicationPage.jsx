@@ -422,7 +422,7 @@ const ApplicationPage = () => {
                       />
                     </td>
                     {/* TASKS (read-only = 0 on create) */}
-                    <td className="px-3 py-2 align-top text-gray-500">0</td>
+                    <td className="px-3 py-2 align-top flex justify-center text-gray-500">0</td>
                     <td className="px-3 py-2 align-top">
                       <button
                         className="h-8 w-8 rounded flex items-center justify-center item bg-blue-600 text-white text-2xl leading-none"
@@ -599,7 +599,7 @@ const ApplicationPage = () => {
                         )}
                       </td>
                       {/* TASKS (read-only) */}
-                      <td className="px-3 py-3 align-top">
+                      <td className="px-3 py-3 align-top flex justify-center">
                         {a.App_Rnumber ?? 0}
                       </td>
                       {/* ACTION: Save (project lead only) */}
