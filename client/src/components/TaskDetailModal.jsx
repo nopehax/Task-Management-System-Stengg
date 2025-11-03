@@ -189,7 +189,7 @@ export default function TaskDetailModal({
             {/* State action buttons (Release Task / Pick Up Task / etc) */}
             <div className="flex flex-wrap gap-2">
               {stateActions && stateActions.length > 0 ? (
-                stateActions.map((action, idx) => (
+                stateActions.filter((a) => !a.disabled).map((action, idx) => (
                   <button
                     key={idx}
                     className={`text-sm font-medium rounded px-4 py-2 ${
@@ -258,7 +258,7 @@ export default function TaskDetailModal({
                   onChange={(e) => setNoteDraft(e.target.value)}
                 />
 
-                <button
+                {canModifyCurrentState && <button
                   className={`mt-2 text-sm font-medium rounded px-4 py-2 ${
                     canModifyCurrentState && noteDraft.trim()
                       ? "bg-gray-800 text-white hover:bg-gray-900"
@@ -268,7 +268,7 @@ export default function TaskDetailModal({
                   onClick={handleAddNote}
                 >
                   Add Note
-                </button>
+                </button>}
               </div>
             )}
           </div>
