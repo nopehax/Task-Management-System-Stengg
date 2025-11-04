@@ -10,7 +10,7 @@ export default function TaskColumn({
   return (
     <div className="flex-1 min-w-[240px] bg-white border border-gray-200 rounded-md shadow-sm flex flex-col mr-4 last:mr-0">
       {/* Column header */}
-      <div className="flex items-start justify-between bg-gray-50 rounded-t-md px-4 py-3 border-b border-gray-200">
+      <div className="flex items-start justify-between bg-gray-50 rounded-t-md px-4 py-3 border-b border-gray-200 h-[48px]">
         <div className="text-sm font-semibold text-gray-800">{title}</div>
 
         {showAddTaskButton ? (
