@@ -192,11 +192,10 @@ export default function TaskDetailModal({
                 stateActions.filter((a) => !a.disabled).map((action, idx) => (
                   <button
                     key={idx}
-                    className={`text-sm font-medium rounded px-4 py-2 ${
-                      action.disabled
+                    className={`text-sm font-medium rounded px-4 py-2 ${action.disabled
                         ? "bg-indigo-200 text-white cursor-not-allowed"
                         : "bg-indigo-600 text-white hover:bg-indigo-700"
-                    }`}
+                      }`}
                     disabled={action.disabled}
                     onClick={() => {
                       if (!action.disabled) {
@@ -259,11 +258,10 @@ export default function TaskDetailModal({
                 />
 
                 {canModifyCurrentState && <button
-                  className={`mt-2 text-sm font-medium rounded px-4 py-2 ${
-                    canModifyCurrentState && noteDraft.trim()
+                  className={`mt-2 text-sm font-medium rounded px-4 py-2 ${canModifyCurrentState && noteDraft.trim()
                       ? "bg-gray-800 text-white hover:bg-gray-900"
                       : "bg-gray-300 text-white cursor-not-allowed"
-                  }`}
+                    }`}
                   disabled={!canModifyCurrentState || !noteDraft.trim()}
                   onClick={handleAddNote}
                 >

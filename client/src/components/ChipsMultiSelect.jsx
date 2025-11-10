@@ -145,7 +145,7 @@ export default function ChipsMultiSelect({
               onClick={() => !isDisabled && toggleOption(opt)}
               onKeyDown={(e) => {
                 if (isDisabled) return;
-                if (e.key === "Enter" || e.key === " ") 
+                if (e.key === "Enter" || e.key === " ")
                   toggleOption(opt);
               }}
               tabIndex={0}
@@ -160,7 +160,7 @@ export default function ChipsMultiSelect({
               }}
               title={isDisabled ? "This option is disabled" : undefined}
             >
-              <input type="checkbox" checked={selected} readOnly disabled={isDisabled}/>
+              <input type="checkbox" checked={selected} readOnly disabled={isDisabled} />
               <span>{opt}</span>
             </div>
           );

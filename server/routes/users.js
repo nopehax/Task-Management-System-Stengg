@@ -80,7 +80,7 @@ router.post('/users', authRequired, requireGroup(['admin']), async (req, res) =>
 
     } catch (err) {
       // Roll back + release before handling
-      try { await conn.rollback(); } catch {}
+      try { await conn.rollback(); } catch { }
       conn.release();
 
       if (err && err.code === "ER_DUP_ENTRY") {
@@ -106,7 +106,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
 
   const incoming = req.body || {};
   const updates = [];
-  const values  = [];
+  const values = [];
 
   if (incoming.email !== undefined) {
     if (!isValidEmail(incoming.email)) {
@@ -130,13 +130,13 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
       return res.status(400).json({ error: "Cannot remove admin group from original admin." });
     }
     if (groups.length > 0) {
-    const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
-    const catalog = new Set(catalogRows.map(r => r.name));
-    const invalid = groups.filter(g => !catalog.has(g));
-    if (invalid.length) {
-      return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+      const [catalogRows] = await pool.execute("SELECT name FROM userGroups");
+      const catalog = new Set(catalogRows.map(r => r.name));
+      const invalid = groups.filter(g => !catalog.has(g));
+      if (invalid.length) {
+        return res.status(400).json({ error: "Unknown groups: " + invalid.join(", ") });
+      }
     }
-  }
     groupsPayload = groups;
     updates.push("`userGroups` = ?"); values.push(JSON.stringify(groupsPayload));
   }
@@ -198,7 +198,7 @@ router.patch('/users/:username', authRequired, requireGroup(['admin']), async (r
       });
 
     } catch (err) {
-      try { await conn.rollback(); } catch {}
+      try { await conn.rollback(); } catch { }
       conn.release();
 
       if (err && err.code === "ER_DUP_ENTRY") {
@@ -226,7 +226,7 @@ router.patch('/user/:username', authRequired, async (req, res) => {
 
   const incoming = req.body || {};
   const updates = [];
-  const values  = [];
+  const values = [];
 
   // validation checks first)
   if (incoming.email !== undefined) {
@@ -237,7 +237,7 @@ router.patch('/user/:username', authRequired, async (req, res) => {
   }
 
   let newPasswordHash = null;
-  let newPasswordRaw  = null;
+  let newPasswordRaw = null;
   if (incoming.password !== undefined) {
     const raw = String(incoming.password ?? "");
     if (!isValidPass(raw)) {
@@ -247,7 +247,7 @@ router.patch('/user/:username', authRequired, async (req, res) => {
     if (!cur) {
       return res.status(400).json({ error: "Current password is required to set a new password." });
     }
-    newPasswordRaw  = raw;
+    newPasswordRaw = raw;
     newPasswordHash = await getHash(raw);
     updates.push("`password` = ?");
     values.push(newPasswordHash);
@@ -316,7 +316,7 @@ router.patch('/user/:username', authRequired, async (req, res) => {
       });
 
     } catch (err) {
-      try { await conn.rollback(); } catch {}
+      try { await conn.rollback(); } catch { }
       conn.release();
 
       if (err && err.code === "ER_DUP_ENTRY") {

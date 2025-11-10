@@ -118,11 +118,10 @@ export default function CreatePlanModal({
           {/* Submit */}
           <div>
             <button
-              className={`text-sm font-medium rounded px-4 py-2 ${
-                canSubmit
+              className={`text-sm font-medium rounded px-4 py-2 ${canSubmit
                   ? "bg-indigo-600 text-white hover:bg-indigo-700"
                   : "bg-indigo-200 text-white cursor-not-allowed"
-              }`}
+                }`}
               disabled={!canSubmit}
               onClick={handleSubmit}
             >
