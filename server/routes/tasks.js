@@ -598,4 +598,332 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
   }
 });
 
+// Additional (redundant) endpoints for evaluation purposes
+// return unauthorized message to error code
+
+router.post("/CreateTask", authRequired, async (req, res) => {
+  // pull body
+  if (!req.body) {
+    return res.status(400).json({ status: "P_1" });
+  }
+  const {
+    Task_name,
+    Task_description,
+    Task_plan,
+    Task_app_acronym,
+    Task_state,
+    Task_creator,
+    // Task_id and Task_createDate are NOT accepted from client
+  } = req.body || {};
+  if (!Task_name || !Task_description || !Task_plan || !Task_app_acronym || !Task_state || !Task_creator) {
+    return res.status(400).json({ status: "P_2" });
+  }
+
+  // Synchronous (non-DB) validation first
+  if (
+    !Task_name ||
+    typeof Task_name !== "string" ||
+    Task_name.length > 50
+  ) {
+    return res
+      .status(400)
+      .json({ status: "P_4" });
+  }
+
+  if (
+    typeof Task_description !== "string" ||
+    Task_description.length > 255
+  ) {
+    return res
+      .status(400)
+      .json({ status: "P_5" });
+  }
+
+  if (
+    typeof Task_plan !== "string" ||
+    Task_plan.length > 50
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Invalid Task_plan (max 50 chars)" });
+  }
+
+  if (
+    !Task_app_acronym ||
+    typeof Task_app_acronym !== "string" ||
+    Task_app_acronym.length > 50
+  ) {
+    return res.status(400).json({
+      error: "Invalid Task_app_acronym (max 50 chars)",
+    });
+  }
+
+  if (!isValidState(Task_state)) {
+    return res.status(400).json({
+      error: "Invalid Task_state",
+    });
+  }
+
+  if (
+    !Task_creator ||
+    typeof Task_creator !== "string" ||
+    Task_creator.length > 50
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Invalid Task_creator (max 50 chars)" });
+  }
+
+  // check if user is allowed to create a task in this application.
+  const task_owner = "(unassigned)";
+  const [rows] = await pool.query(
+    `SELECT App_permit_Create
+      FROM applications
+      WHERE App_acronym = ?
+      LIMIT 1`,
+    [Task_app_acronym.trim()]
+  );
+  const allowedGroups = rows[0].App_permit_Create || "[]";
+  if (!(await checkGroup(req.auth?.username, allowedGroups))) {
+    return res.status(403).json({ status: "IAM_2" });
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // compute Task_id and incremented App_Rnumber
+    const [appRows] = await conn.query(
+      `SELECT App_Rnumber
+         FROM applications
+        WHERE App_Acronym = ?
+        LIMIT 1`,
+      [Task_app_acronym.trim()]
+    )
+    if (!appRows.length) {
+      await conn.rollback();
+      return res.status(400).json({ status: "TR_1" });
+    }
+    const currentR = Number(appRows[0].App_Rnumber ?? 0);
+    const newR = currentR + 1;
+    const newTaskId = `${Task_app_acronym.trim()}_${newR}`;
+
+    // 5. Ensure Task_plan exists in plans
+    const [planRows] = await conn.query(
+      `SELECT 1
+         FROM plans
+        WHERE Plan_MVP_name = ?
+        LIMIT 1`,
+      [Task_plan.trim()]
+    );
+    if (Task_plan && !planRows.length) {
+      await conn.rollback();
+      return res.status(400).json({
+        status: "TR_2"
+      });
+    }
+
+    // 6. Insert task
+    const createDate = todayIsoDate(); // yyyy-MM-dd
+    if (!isIsoDateString(createDate)) {
+      await conn.rollback();
+      return res
+        .status(500)
+        .json({ status: "UE" });
+    }
+
+    const insertSql = `
+      INSERT INTO tasks
+        (Task_name,
+         Task_description,
+         Task_notes,
+         Task_id,
+         Task_plan,
+         Task_app_acronym,
+         Task_state,
+         Task_creator,
+         Task_owner,
+         Task_createDate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+    const insertParams = [
+      Task_name.trim(),
+      Task_description.trim(),
+      JSON.stringify([]),
+      newTaskId,
+      Task_plan.trim() || null,
+      Task_app_acronym.trim(),
+      Task_state,
+      Task_creator.trim(),
+      task_owner.trim(),
+      createDate,
+    ];
+    await conn.query(insertSql, insertParams);
+
+    // 7. Update application's App_Rnumber
+    await conn.query(
+      `UPDATE applications
+          SET App_Rnumber = ?
+        WHERE App_Acronym = ?`,
+      [newR, Task_app_acronym.trim()]
+    );
+
+    // 8. Read back the inserted row
+    const [rows] = await conn.query(
+      `SELECT Task_id,
+              Task_name,
+              Task_description,
+              Task_notes,
+              Task_plan,
+              Task_app_acronym,
+              Task_state,
+              Task_creator,
+              Task_owner,
+              Task_createDate
+         FROM tasks
+        WHERE Task_id = ?
+        LIMIT 1`,
+      [newTaskId]
+    );
+
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(500).json({ status: "UE" });
+    }
+
+    const record = normalizeTaskRow(rows[0]);
+
+    // commit and return
+    await conn.commit();
+    return res.status(201).json({ status: "S_1" });
+  } catch (err) {
+    if (conn) {
+      try {
+        await conn.rollback();
+      } catch (_) { }
+    }
+    if (err && err.code === "ER_DUP_ENTRY") {
+      return res.status(400).json({ error: "Task already exists" });
+    }
+    console.error("POST /api/tasks error:", err);
+    return res.status(500).json({ status: "UE" });
+  } finally {
+    if (conn) conn.release();
+  }
+});
+
+// GET /api/tasks/state/:state
+router.get("/tasks/state/:state", authRequired, async (req, res) => {
+  try {
+    const { state } = req.params;
+    if (!isValidState(state)) {
+      return res.status(400).json({ status: "U_1" });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT
+         Task_name,
+         Task_description,
+         Task_notes,
+         Task_id,
+         Task_plan,
+         Task_app_acronym,
+         Task_state,
+         Task_creator,
+         Task_owner,
+         Task_createDate
+       FROM tasks
+       WHERE Task_state = ?`,
+      [state]
+    );
+    const out = rows.map(normalizeTaskRow);
+
+    return res.json(out);
+  } catch (err) {
+    return res.status(500).json({ status: "UE" });
+  }
+});
+
+router.post("/tasks/:taskId/PromoteTaskToDone", authRequired, async (req, res) => {
+  const { taskId } = req.params || {};
+  if (!taskId || !taskId.trim()) {
+    return res.status(400).json({ status: "U_1" }); // Malformed URL/URI
+  }
+
+  let conn;
+  try {
+    conn = await pool.getConnection();
+    await conn.beginTransaction();
+
+    // 1) Lock the task row
+    const [tRows] = await conn.query(
+      `SELECT Task_id, Task_state, Task_app_acronym
+           FROM tasks
+          WHERE Task_id = ?
+          FOR UPDATE`,
+      [taskId]
+    );
+    if (!tRows.length) {
+      await conn.rollback();
+      return res.status(404).json({ status: "TR_1" }); // Task not found
+    }
+
+    const task = tRows[0];
+    if (task.Task_state !== "Doing") {
+      await conn.rollback();
+      return res.status(409).json({ status: "TR_2" }); // Task not in "Doing"
+    }
+
+    // 2) Load app to get App_permit_Doing
+    const [aRows] = await conn.query(
+      `SELECT App_permit_Doing
+           FROM applications
+          WHERE App_Acronym = ?`,
+      [task.Task_app_acronym]
+    );
+    const app = aRows[0];
+
+    // Parse permit list
+    let permitDoing = [];
+    try {
+      const raw = app?.App_permit_Doing;
+      permitDoing = Array.isArray(raw) ? raw : JSON.parse(raw || "[]");
+    } catch {
+      permitDoing = [];
+    }
+
+    // 3) Authorization (IAM_2)
+    const userGroups = Array.isArray(req.user?.userGroups)
+      ? req.user.userGroups
+      : [];
+    const authorized = userGroups.some((g) => permitDoing.includes(g));
+    if (!authorized) {
+      await conn.rollback();
+      return res.status(403).json({ status: "IAM_2" }); // Not authorized
+    }
+
+    // 4) Promote Doing -> Done
+    await conn.query(
+      `UPDATE tasks
+            SET Task_state = 'Done'
+          WHERE Task_id = ?`,
+      [task.Task_id]
+    );
+
+    await conn.commit();
+    return res.json({ status: "S_1" });
+  } catch (err) {
+    if (conn) {
+      try { await conn.rollback(); } catch (_) { }
+    }
+    return res.status(500).json({ status: "UE" });
+  } finally {
+    if (conn) conn.release();
+  }
+}
+);
+
+
+
 module.exports = router;

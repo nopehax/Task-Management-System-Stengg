@@ -28,7 +28,7 @@ async function checkGroup(username, groupOrArray) {
 // Cookie JWT → req.auth = { username, email, userGroups, active }
 function authRequired(req, res, next) {
   const token = req.cookies?.token;
-  if (!token) return res.status(401).json({ error: "Not authenticated" });
+  if (!token) return res.status(401).json({ status: "IAM_1" });
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || "dev-secret");
     const { username, email, userGroups, active } = payload || {};
