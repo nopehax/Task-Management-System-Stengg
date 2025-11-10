@@ -814,7 +814,7 @@ router.post("/CreateTask", authRequired, async (req, res) => {
 });
 
 // GET /api/tasks/state/:state
-router.get("/tasks/state/:state", authRequired, async (req, res) => {
+router.get("/tasks/GetTaskByState/:state", authRequired, async (req, res) => {
   try {
     const { state } = req.params;
     if (!isValidState(state)) {
