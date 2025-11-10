@@ -54,7 +54,7 @@ router.post('/usergroups', authRequired, requireGroup(['admin']), async (req, re
       }
 
     } catch (err) {
-      try { await conn.rollback(); } catch {}
+      try { await conn.rollback(); } catch { }
       conn.release();
 
       if (

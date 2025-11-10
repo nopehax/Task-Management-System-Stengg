@@ -115,7 +115,7 @@ export default function UserManagementPage() {
       } catch (e) {
         setPageError(
           (e instanceof Error ? e.message : String(e)) +
-            ". Please try again later."
+          ". Please try again later."
         );
       } finally {
         setLoading(false);
@@ -166,11 +166,11 @@ export default function UserManagementPage() {
     if (isNew) {
       if (!r.password || !/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(r.password)) {
         return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
-    } else if (r.password && !/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(r.password)) {
-      return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
+      } else if (r.password && !/^(?=.{8,10}$)(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9])\S+$/.test(r.password)) {
+        return "Password must be 8–10 characters long and include at least one letter, one number, and one special character.";
+      }
+      return "";
     }
-    return "";
-  }
   };
 
   const saveRow = async (row) => {
@@ -251,12 +251,12 @@ export default function UserManagementPage() {
         prev.map((r) =>
           r.username === row.username
             ? {
-                ...r,
-                saving: false,
-                rowErr:
-                  e?.response?.data?.error ||
-                  (e instanceof Error ? e.message : String(e)),
-              }
+              ...r,
+              saving: false,
+              rowErr:
+                e?.response?.data?.error ||
+                (e instanceof Error ? e.message : String(e)),
+            }
             : r
         )
       );
@@ -343,7 +343,7 @@ export default function UserManagementPage() {
     } catch (e) {
       setCreateErr(
         e?.response?.data?.error ||
-          (e instanceof Error ? e.message : String(e))
+        (e instanceof Error ? e.message : String(e))
       );
       setTimeout(() => setCreateErr(""), 5000);
     } finally {
@@ -382,8 +382,8 @@ export default function UserManagementPage() {
     } catch (e) {
       setGroupErr(
         e?.response?.data?.error ||
-          (e instanceof Error ? e.message : String(e)) ||
-          "Failed to add group"
+        (e instanceof Error ? e.message : String(e)) ||
+        "Failed to add group"
       );
       setTimeout(() => setGroupErr(""), 5000)
     } finally {
@@ -530,7 +530,7 @@ export default function UserManagementPage() {
                 const isAdminRow = r.username === "admin";
                 const isSuperAdmin = (currentUser?.username || "") === "admin";
                 const disabledRow = isAdminRow && !isSuperAdmin;
-                const canSave =  !r.saving && rowChanged(r);
+                const canSave = !r.saving && rowChanged(r);
 
                 return (
                   <React.Fragment key={r.username}>
@@ -541,7 +541,7 @@ export default function UserManagementPage() {
                           className={["w-full rounded-md border border-slate-300 px-3 py-2 bg-slate-150 text-slate-500 cursor-not-allowed",
                           ].join(" ")}
                           value={r.username}
-                          onChange={() => {}}
+                          onChange={() => { }}
                           disabled
                         />
                       </td>
@@ -570,7 +570,7 @@ export default function UserManagementPage() {
                             // !disabledRow &&
                             setField(r.username, "email", e.target.value)
                           }
-                          // disabled={disabledRow}
+                        // disabled={disabledRow}
                         />
                       </td>
 
@@ -586,7 +586,7 @@ export default function UserManagementPage() {
                             // !disabledRow &&
                             setField(r.username, "password", e.target.value)
                           }
-                          // disabled={disabledRow}
+                        // disabled={disabledRow}
                         />
                       </td>
 
@@ -610,8 +610,8 @@ export default function UserManagementPage() {
                           {r.saving
                             ? "Saving…"
                             : r.savedTick
-                            ? "✓ Saved"
-                            : "Save"}
+                              ? "✓ Saved"
+                              : "Save"}
                         </button>
                       </td>
                     </tr>

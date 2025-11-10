@@ -342,7 +342,7 @@ export default function TaskPage() {
     }
 
     if (payload.Task_state === "ToDo") {
-        payload.Task_plan = editedPlan;
+      payload.Task_plan = editedPlan;
     }
 
     try {

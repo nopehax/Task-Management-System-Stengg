@@ -57,7 +57,7 @@ function isValidNotes(obj, taskCurrState) {
   return true;
 }
 
-function todayIsoDate(full=false) {
+function todayIsoDate(full = false) {
   const d = new Date();
   if (full) return d;
 
@@ -320,7 +320,7 @@ router.post("/tasks", authRequired, async (req, res) => {
     if (conn) {
       try {
         await conn.rollback();
-      } catch (_) {}
+      } catch (_) { }
     }
     if (err && err.code === "ER_DUP_ENTRY") {
       return res.status(400).json({ error: "Task already exists" });
@@ -355,12 +355,12 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
 
   // check that user is allowed to edit this task
   const [rows] = await pool.query(
-        `SELECT Task_state
+    `SELECT Task_state
            FROM tasks
           WHERE Task_id = ?
           LIMIT 1`,
-        [taskId]
-      );
+    [taskId]
+  );
   const taskCurrState = rows[0].Task_state
   const permit = 'App_permit_' + taskCurrState;
   const [rows2] = await pool.query(
@@ -480,7 +480,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
           });
         }
       }
-      
+
       const stateChangeNote = {
         author: req.auth.username,
         status: taskCurrState,
@@ -589,7 +589,7 @@ router.patch("/tasks/:taskId", authRequired, async (req, res) => {
     if (conn) {
       try {
         await conn.rollback();
-      } catch (_) {}
+      } catch (_) { }
     }
     console.error("PATCH /api/tasks/:taskId error:", err);
     return res.status(500).json({ error: "Failed to update task" });
