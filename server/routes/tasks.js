@@ -818,7 +818,7 @@ router.get("/tasks/GetTaskByState/:state", authRequired, async (req, res) => {
   try {
     const { state } = req.params;
     if (!isValidState(state)) {
-      return res.status(400).json({ status: "U_1" });
+      return res.status(400).json({ status: "P_1" });
     }
 
     const [rows] = await pool.query(
@@ -892,11 +892,8 @@ router.post("/tasks/:taskId/PromoteTaskToDone", authRequired, async (req, res) =
     } catch {
       permitDoing = [];
     }
-
     // 3) Authorization (IAM_2)
-    const userGroups = Array.isArray(req.user?.userGroups)
-      ? req.user.userGroups
-      : [];
+    const userGroups = req.auth?.userGroups;
     const authorized = userGroups.some((g) => permitDoing.includes(g));
     if (!authorized) {
       await conn.rollback();
@@ -921,9 +918,6 @@ router.post("/tasks/:taskId/PromoteTaskToDone", authRequired, async (req, res) =
   } finally {
     if (conn) conn.release();
   }
-}
-);
-
-
+});
 
 module.exports = router;

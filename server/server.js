@@ -36,6 +36,10 @@ app.use('/api', applicationsRoutes);
 app.use('/api', plansRoutes);
 app.use('/api', tasksRoutes);
 
+// for unknown endpoints
+app.use((req, res) => {
+  res.status(404).json({ status: 'U_1' });
+});
 
 // startup
 const PORT = 3000;
