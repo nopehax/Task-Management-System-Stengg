@@ -1,0 +1,43 @@
+FROM node:22-alpine
+
+ENV NODE_ENV=production
+
+ARG USER_ID=4000
+ARG GROUP_ID=4000
+ENV NODE_USER=tmsappuser
+ENV NODE_GROUP=tmsappuser
+
+# Create non-root user, app directory, and set perms/ownership on the directory only
+RUN addgroup -g ${GROUP_ID} -S ${NODE_GROUP} \
+    && adduser -S -H -D -u ${USER_ID} -G ${NODE_GROUP} ${NODE_USER} \
+    && mkdir -p /usr/src/app \
+    && chown ${NODE_USER}:${NODE_GROUP} /usr/src/app \
+    && chmod 755 /usr/src/app
+
+WORKDIR /usr/src/app
+
+# Copy deps metadata + tarball (root owns them, which is fine for read-only)
+COPY package*.json ./
+COPY server-1.0.0.tgz ./
+
+# Install from tarball, verify package.json, move node_modules, clean up
+RUN set -eux; \
+    mkdir ./tmpfldr; \
+    npm install --omit=dev --no-fund --no-audit ./server-1.0.0.tgz --prefix ./tmpfldr; \
+    cmp -s package.json ./tmpfldr/node_modules/server/package.json \
+    || (echo "package.json mismatch!" >&2; exit 1); \
+    mv ./tmpfldr/node_modules/server/node_modules ./node_modules; \
+    rm -rf ./tmpfldr server-1.0.0.tgz; \
+    npm cache clean --force; \
+    rm -rf /root/.npm
+
+# Copy the rest of the app (still owned by root → read-only for the app user)
+# Make sure .dockerignore excludes node_modules, .git, logs, etc.
+COPY . .
+RUN rm ./server-1.0.0.tgz;
+
+USER ${NODE_USER}
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]

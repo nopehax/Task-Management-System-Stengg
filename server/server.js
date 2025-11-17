@@ -28,7 +28,7 @@ app.use(cookieParser());
 app.use(cors(corsOptions));
 
 // routes
-app.get('/api/check', async (_req, res) => res.sendStatus(200).send("server is up and running"));
+app.get('/api/check', async (_req, res) => res.status(200).json({ status: "OK", message: "server is up and running", time: new Date().toLocaleString('en-SG', { timeZone: 'Asia/Singapore' }) }));
 app.use('/api', authRoutes);
 app.use('/api', usersRoutes);
 app.use('/api', userGroupsRoutes);

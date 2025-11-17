@@ -1,0 +1,7 @@
+node-22-alpine.tar
+node_modules
+.git
+.gitignore
+dockerfile
+.env
+README.md
